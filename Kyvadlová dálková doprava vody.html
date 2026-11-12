@@ -1,0 +1,527 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kyvadlová dálková doprava vody</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: výsledky nahoře, pod nimi vlevo vstupy a vpravo animace, průběh a tabulky; na telefonu jeden sloupec. */
+:root{
+  --bg:#edf1f4; --surface:#ffffff; --ink:#15222b; --muted:#566772; --line:#d2dbe2;
+  --water:#14639f; --water-soft:#cfe2f1; --on-water:#ffffff;
+  --fire:#c93c1a; --warn:#b67600; --ok:#1c7848; --drive:#9eabb5; --road:#dfe6eb;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e161c; --surface:#16212a; --ink:#e5ecf1; --muted:#92a3af; --line:#2a3944;
+    --water:#5aa8e4; --water-soft:#1c3a53; --on-water:#07131c;
+    --fire:#ff7b54; --warn:#e2aa3c; --ok:#56c18b; --drive:#5a6a76; --road:#1f2c36;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e161c; --surface:#16212a; --ink:#e5ecf1; --muted:#92a3af; --line:#2a3944;
+  --water:#5aa8e4; --water-soft:#1c3a53; --on-water:#07131c;
+  --fire:#ff7b54; --warn:#e2aa3c; --ok:#56c18b; --drive:#5a6a76; --road:#1f2c36;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:20px}
+header .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,4vw,36px);line-height:1.1;margin:4px 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:65ch}
+h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0;text-wrap:balance}
+h3{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+
+.results{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px}
+.res{padding:16px 18px;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0;display:flex;flex-direction:column;gap:4px}
+.res.primary{background:var(--water);border-color:var(--water);color:var(--on-water)}
+.res.primary h3,.res.primary .sub{color:var(--on-water);opacity:.85}
+.big{font-family:var(--f-display);font-weight:600;font-size:clamp(30px,5vw,44px);line-height:1.05;font-variant-numeric:tabular-nums}
+.big small{font-size:.45em;font-weight:500;margin-left:.25em}
+.sub{color:var(--muted);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:600;border:1.5px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.bad{color:var(--fire)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.kv{display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:13px;margin:4px 0 0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--f-data);font-variant-numeric:tabular-nums;text-align:right}
+
+.main{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+.inputs{display:flex;flex-direction:column;gap:18px}
+fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+legend{padding:0;margin-bottom:8px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.f{display:grid;grid-template-columns:1fr 104px;gap:10px;align-items:center}
+.f label{font-size:14px}
+.f .hint{display:block;font-size:12px;color:var(--muted);font-family:var(--f-data)}
+.num{display:flex;align-items:center;border:1px solid var(--line);border-radius:4px;background:var(--bg);overflow:hidden}
+.num:focus-within{outline:2px solid var(--water);outline-offset:1px}
+.num input{width:100%;min-width:0;border:0;background:transparent;color:var(--ink);font:500 14px var(--f-data);padding:7px 2px 7px 8px;text-align:right;outline:0;-moz-appearance:textfield}
+.num input::-webkit-outer-spin-button,.num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.num span{font-size:11px;color:var(--muted);padding:0 7px 0 3px;white-space:nowrap}
+select{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 8px;width:100%}
+.tk-head,.tk-row{display:grid;grid-template-columns:20px 1fr 1fr 1fr 30px;gap:6px;align-items:center}
+.tk-head{font-size:11px;color:var(--muted);line-height:1.2}
+.tk-row .n{font-family:var(--f-data);font-size:13px;color:var(--muted)}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--water)}
+button:focus-visible,select:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+button.x{padding:0;width:30px;height:32px;color:var(--muted)}
+button.go{background:var(--water);border-color:var(--water);color:var(--on-water);font-weight:600;min-width:104px}
+button.link{border:0;background:none;padding:0;color:var(--water);text-decoration:underline;font-size:13px;text-align:left}
+.err{color:var(--fire);font-size:13px;font-weight:500}
+
+.vis{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;margin-bottom:10px}
+.clock{font-family:var(--f-data);font-size:14px;font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.ctl input[type=range]{flex:1 1 160px;min-width:0;accent-color:var(--water)}
+.ctl select{width:auto}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted);font-size:12px}
+td{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+td:first-child{font-family:var(--f-body)}
+tr.limit td{font-weight:600;color:var(--fire)}
+tr.sim td{font-weight:600}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.notes{color:var(--muted);font-size:13px;max-width:75ch}
+.notes ul{margin:6px 0 0;padding-left:18px}
+@media (max-width:860px){
+  .results{grid-template-columns:1fr}
+  .main{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ČSN 73 0873 · podklad pro revizi</div>
+    <h1>Kyvadlová dálková doprava vody</h1>
+    <p>Simulace kyvadlové dálkové dopravy vody mezi hydrantem a stojící CAS u požáru. Výsledkem je průtok, který lze na hašení dodávat.</p>
+  </header>
+
+  <section class="results" aria-live="polite">
+    <div class="res primary">
+      <h3 id="r-unint-h">Dostupný průtok bez přerušení</h3>
+      <div class="big" id="r-unint">–</div>
+      <div class="sub" id="r-unint-sub">stojící CAS se po celou dobu nevyprázdní</div>
+    </div>
+    <div class="res">
+      <h3>Průměrná dodávka kyvadlové dálkové dopravy vody</h3>
+      <div class="big" id="r-sust">–</div>
+      <div class="sub" id="r-sust-sub">ustálený stav, horní mez</div>
+    </div>
+    <div class="res">
+      <h3 id="r-set-h">Zadaný průtok</h3>
+      <span class="pill ok" id="r-pill">–</span>
+      <dl class="kv" id="r-kv"></dl>
+    </div>
+  </section>
+
+  <div class="main">
+    <form class="panel inputs" id="form" autocomplete="off">
+      <div class="err" id="err" hidden></div>
+      <fieldset>
+        <legend>Požár a stojící CAS</legend>
+        <div class="f"><label for="Vs">Objem nádrže stojící CAS</label><div class="num"><input id="Vs" type="number" inputmode="decimal" step="any" min="0"><span>l</span></div></div>
+        <div class="f"><label for="Q">Zadaný průtok hašení<span class="hint" id="Q-h"></span></label><div class="num"><input id="Q" type="number" inputmode="decimal" step="any" min="0"><span>l/min</span></div></div>
+        <button type="button" class="link" id="useSust">Nastavit na dostupný průtok bez přerušení</button>
+        <div class="f"><label for="T">Doba zásahu</label><div class="num"><input id="T" type="number" inputmode="decimal" step="any" min="1" max="1440"><span>min</span></div></div>
+        <div class="f"><label for="Qv">Průtok při vypouštění do stojící CAS<span class="hint" id="Qv-h"></span></label><div class="num"><input id="Qv" type="number" inputmode="decimal" step="any" min="0"><span>l/min</span></div></div>
+        <div class="f"><label for="tf">Manipulace u požáru (ustavení, hadice)</label><div class="num"><input id="tf" type="number" inputmode="decimal" step="any" min="0"><span>min</span></div></div>
+      </fieldset>
+      <fieldset>
+        <legend>Hydrant</legend>
+        <div class="f"><label for="Qh">Průtok hydrantu při plnění<span class="hint" id="Qh-h"></span></label><div class="num"><input id="Qh" type="number" inputmode="decimal" step="any" min="0"><span>l/min</span></div></div>
+        <div class="f"><label for="th">Manipulace u hydrantu (ustavení, hadice)</label><div class="num"><input id="th" type="number" inputmode="decimal" step="any" min="0"><span>min</span></div></div>
+      </fieldset>
+      <fieldset>
+        <legend>Trasa</legend>
+        <div class="f"><label for="d1">Vzdálenost tam (požár → hydrant)</label><div class="num"><input id="d1" type="number" inputmode="decimal" step="any" min="0"><span>km</span></div></div>
+        <div class="f"><label for="d2">Vzdálenost zpět (hydrant → požár)</label><div class="num"><input id="d2" type="number" inputmode="decimal" step="any" min="0"><span>km</span></div></div>
+      </fieldset>
+      <fieldset>
+        <legend>Kyvadlové CAS</legend>
+        <div class="tk-head"><span></span><span>Objem [l]</span><span>Rychlost tam [km/h]</span><span>Rychlost zpět [km/h]</span><span></span></div>
+        <div id="tks" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" id="add">Přidat CAS</button>
+        <div class="f" style="grid-template-columns:1fr"><label for="start">Stav kyvadlových CAS na začátku</label>
+          <select id="start"><option value="full">Plné, stojí u požáru</option><option value="empty">Prázdné, vyjíždějí k hydrantu</option></select></div>
+      </fieldset>
+      <button type="button" id="reset">Obnovit výchozí hodnoty</button>
+    </form>
+
+    <div class="vis">
+      <section class="panel">
+        <div class="panel-h"><h2>Průběh kyvadlové dálkové dopravy vody</h2><span class="clock" id="clock">0:00:00</span></div>
+        <canvas id="scene" role="img" aria-label="Animace CAS mezi požárem a hydrantem"></canvas>
+        <div class="ctl">
+          <button type="button" class="go" id="play">Přehrát</button>
+          <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Čas simulace">
+          <select id="speed" aria-label="Rychlost přehrávání"><option value="30">30×</option><option value="60" selected>60×</option><option value="180">180×</option><option value="600">600×</option></select>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Zásoba ve stojící CAS a činnost CAS</h2><span class="sub" id="chart-sub"></span></div>
+        <canvas id="chart" role="img" aria-label="Graf zásoby vody ve stojící CAS a časový rozpis činnosti CAS"></canvas>
+        <div class="legend">
+          <span><i style="background:var(--water)"></i>plnění u hydrantu</span>
+          <span><i style="background:var(--ok)"></i>výdej u požáru</span>
+          <span><i style="background:var(--drive)"></i>jízda</span>
+          <span><i style="background:var(--warn)"></i>čekání ve frontě</span>
+          <span><i style="background:var(--fire)"></i>hašení bez vody</span>
+        </div>
+      </section>
+
+      <div class="two">
+        <section class="panel">
+          <div class="panel-h"><h2>Co průtok omezuje</h2></div>
+          <div class="scroll"><table id="bounds"></table></div>
+          <p class="sub" style="margin:8px 0 0">Meze jsou ruční kontrolní výpočet. Simulace vychází stejně nebo níž, protože počítá i s frontami.</p>
+        </section>
+        <section class="panel">
+          <div class="panel-h"><h2>CAS při zadaném průtoku</h2></div>
+          <div class="scroll"><table id="tktable"></table></div>
+        </section>
+      </div>
+
+      <section class="notes">
+        <h3>Předpoklady modelu</h3>
+        <ul>
+          <li>Časový krok 1 s. U hydrantu i u požáru je jedno stanoviště, CAS se obsluhují v pořadí příjezdu.</li>
+          <li>Kyvadlová CAS se vždy naplní celá a vypustí celá. Stojící CAS je na začátku plná.</li>
+          <li>Je-li stojící CAS plná, výdej se zpomalí na průtok hašení a CAS u požáru čeká.</li>
+          <li>Manipulační čas blokuje stanoviště před zahájením plnění nebo výdeje.</li>
+          <li>Dostupný průtok bez přerušení je nejvyšší stálý odběr, při kterém se stojící CAS za dobu zásahu nevyprázdní. Započítává počáteční zásobu.</li>
+          <li>Průměrná dodávka kyvadlové dálkové dopravy vody je dlouhodobý průměr bez počáteční zásoby. Bez přerušení ji lze odebírat jen s dostatečně velkou stojící nádrží, protože voda přijíždí po dávkách.</li>
+          <li>Model nezahrnuje poruchy, střídání osádek, sklon trasy ani kolísání tlaku v hydrantové síti.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/*CORE*/
+// Stavy: 0 jízda k hydrantu, 1 fronta u hydrantu, 2 manipulace u hydrantu, 3 plnění,
+//        4 jízda k požáru, 5 fronta u požáru, 6 manipulace u požáru, 7 výdej
+function simulate(p,qOut,T,o){
+  o=o||{};
+  const dt=o.dt||1,n=p.tk.length,steps=Math.max(1,Math.ceil(T/dt));
+  const st=new Uint8Array(n),x=new Float64Array(n),w=new Float64Array(n),tm=new Float64Array(n);
+  const waitH=new Float64Array(n),waitF=new Float64Array(n),trips=new Float64Array(n);
+  const hQ=[],fQ=[];let hO=-1,fO=-1,L=p.Vs,minL=p.Vs;
+  let delivered=0,used=0,deficit=0,first=-1,hBusy=0,lastDef=0;
+  const evT=[],evD=[],markFrom=o.markFrom||0;
+  let rec=null;
+  if(o.record){const m=(steps+1)*n;rec={lev:new Float32Array(steps+1),def:new Uint8Array(steps+1),st:new Uint8Array(m),pos:new Float32Array(m),w:new Float32Array(m),slot:new Uint8Array(m)};}
+  for(let i=0;i<n;i++){if(p.start==='full'){w[i]=p.tk[i].V;st[i]=5;fQ.push(i);}else{st[i]=0;x[i]=p.d1;}}
+  const need=qOut*dt;
+  for(let k=0;;k++){
+    if(rec){
+      rec.lev[k]=L;rec.def[k]=lastDef;
+      for(let i=0;i<n;i++){
+        const s=st[i],b=k*n+i;rec.st[b]=s;rec.w[b]=w[i];
+        rec.pos[b]=s===0?(p.d1>0?1-Math.max(x[i],0)/p.d1:1):s<4?1:s===4?(p.d2>0?Math.max(x[i],0)/p.d2:0):0;
+        rec.slot[b]=0;
+      }
+      for(let j=0;j<hQ.length;j++)rec.slot[k*n+hQ[j]]=j+(hO>=0?1:0);
+      for(let j=0;j<fQ.length;j++)rec.slot[k*n+fQ[j]]=j+(fO>=0?1:0);
+    }
+    if(k>=steps)break;
+    for(let i=0;i<n;i++){
+      if(st[i]===0){x[i]-=p.tk[i].v1*dt;if(x[i]<=0){st[i]=1;hQ.push(i);}}
+      else if(st[i]===4){x[i]-=p.tk[i].v2*dt;if(x[i]<=0){st[i]=5;fQ.push(i);}}
+    }
+    // hydrant
+    if(hO<0&&hQ.length){const i=hQ.shift();hO=i;if(p.th>0){st[i]=2;tm[i]=p.th;}else st[i]=3;}
+    if(hO>=0){const i=hO;hBusy+=dt;
+      if(st[i]===2){tm[i]-=dt;if(tm[i]<=1e-9)st[i]=3;}
+      else{w[i]+=p.Qh*dt;if(w[i]>=p.tk[i].V-1e-9){w[i]=p.tk[i].V;st[i]=4;x[i]=p.d2;hO=-1;}}
+    }
+    // požár
+    if(fO<0&&fQ.length){const i=fQ.shift();fO=i;if(p.tf>0){st[i]=6;tm[i]=p.tf;}else st[i]=7;}
+    let inflow=0;
+    if(fO>=0){const i=fO;
+      if(st[i]===6){tm[i]-=dt;if(tm[i]<=1e-9)st[i]=7;}
+      else{
+        const cap=o.unlimited?Infinity:(p.Vs-L+need);
+        inflow=Math.max(0,Math.min(p.Qv*dt,w[i],cap));w[i]-=inflow;delivered+=inflow;
+        if(w[i]<=1e-9){w[i]=0;st[i]=0;x[i]=p.d1;trips[i]++;fO=-1;
+          if(i===0&&(k+1)*dt>=markFrom){evT.push((k+1)*dt);evD.push(delivered);}}
+      }
+    }
+    for(let i=0;i<n;i++){if(st[i]===1)waitH[i]+=dt;else if(st[i]===5)waitF[i]+=dt;}
+    lastDef=0;
+    if(!o.unlimited){
+      L+=inflow;const c=Math.min(L,need);L-=c;if(L>p.Vs)L=p.Vs;used+=c;
+      if(c<need-1e-9){deficit+=dt;lastDef=1;if(first<0)first=k*dt;}
+      if(L<minL)minL=L;
+    }
+  }
+  return {dt,steps,n,T:steps*dt,delivered,used,deficit,first,minL,hBusy,waitH,waitF,trips,evT,evD,rec};
+}
+function noWaitCycle(p,t){return (t.v1>0?p.d1/t.v1:0)+p.th+t.V/p.Qh+(t.v2>0?p.d2/t.v2:0)+p.tf+t.V/p.Qv;}
+function cycleEst(p){
+  let travel=0,serv=0;
+  for(const t of p.tk){travel=Math.max(travel,p.d1/t.v1+p.d2/t.v2);serv+=p.th+t.V/p.Qh+p.tf+t.V/p.Qv;}
+  return travel+serv;
+}
+function sustainable(p){ // l/s
+  const cyc=cycleEst(p),T=60*cyc,warm=15*cyc,dt=Math.max(1,Math.ceil(T/1.5e6));
+  const r=simulate(p,0,T,{unlimited:true,dt,markFrom:warm});
+  const m=r.evT.length;
+  if(m>=2)return (r.evD[m-1]-r.evD[0])/(r.evT[m-1]-r.evT[0]);
+  return r.delivered/r.T;
+}
+function maxUninterrupted(p,T){ // l/s
+  const sumV=p.tk.reduce((a,t)=>a+t.V,0),dt=T>21600?2:1;
+  let lo=0,hi=p.Qv+(p.Vs+sumV)/T+1/60;
+  for(let it=0;it<40&&(hi-lo)*60>0.5;it++){
+    const mid=(lo+hi)/2;
+    if(simulate(p,mid,T,{dt}).deficit===0)lo=mid;else hi=mid;
+  }
+  return lo;
+}
+function bounds(p){ // l/s
+  let sumV=0,noQ=0,hT=0,fT=0;
+  for(const t of p.tk){sumV+=t.V;noQ+=t.V/noWaitCycle(p,t);hT+=p.th+t.V/p.Qh;fT+=p.tf+t.V/p.Qv;}
+  return {noQ,hyd:sumV/hT,dump:sumV/fT};
+}
+/*END*/
+
+const $=id=>document.getElementById(id);
+const KEY='kdv-inputs-v2';
+const DEF={Vs:4000,Q:450,T:120,Qh:600,th:1,Qv:1200,tf:1,d1:3,d2:3,start:'full',
+  tk:[{V:4000,v1:45,v2:40},{V:9000,v1:40,v2:35},{V:4000,v1:45,v2:40}]};
+const F=['Vs','Q','T','Qh','th','Qv','tf','d1','d2'];
+let S=JSON.parse(JSON.stringify(DEF));
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.tk)&&s.tk.length)S=Object.assign(S,s);}catch(e){}
+
+const nf=(v,d=0)=>v.toLocaleString('cs-CZ',{minimumFractionDigits:d,maximumFractionDigits:d});
+const hms=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),c=s%60;return h+':'+String(m).padStart(2,'0')+':'+String(c).padStart(2,'0');};
+const mins=s=>nf(s/60,1)+' min';
+
+function buildTankers(){
+  const box=$('tks');box.innerHTML='';
+  S.tk.forEach((t,i)=>{
+    const row=document.createElement('div');row.className='tk-row';
+    row.innerHTML=`<span class="n">${i+1}</span>`+['V','v1','v2'].map(k=>
+      `<div class="num"><input id="tk-${k}-${i}" data-i="${i}" data-k="${k}" type="number" inputmode="decimal" step="any" min="0" value="${t[k]}" aria-label="CAS ${i+1}: ${k==='V'?'objem v litrech':k==='v1'?'rychlost tam v km/h':'rychlost zpět v km/h'}"></div>`).join('')+
+      `<button type="button" class="x" data-rm="${i}" aria-label="Odebrat CAS ${i+1}" ${S.tk.length<2?'disabled':''}>×</button>`;
+    box.appendChild(row);
+  });
+  $('add').disabled=S.tk.length>=12;
+}
+function fillForm(){F.forEach(k=>$(k).value=S[k]);$('start').value=S.start;buildTankers();}
+
+function readForm(){
+  F.forEach(k=>S[k]=$(k).valueAsNumber);
+  S.start=$('start').value;
+  document.querySelectorAll('#tks input').forEach(el=>{S.tk[+el.dataset.i][el.dataset.k]=el.valueAsNumber;});
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+}
+function validate(){
+  const pos=v=>Number.isFinite(v)&&v>0,nn=v=>Number.isFinite(v)&&v>=0;
+  if(!pos(S.Vs))return 'Zadejte objem stojící CAS větší než 0.';
+  if(!nn(S.Q))return 'Zadejte průtok hašení (0 nebo více).';
+  if(!pos(S.T)||S.T>1440)return 'Doba zásahu musí být 1 až 1440 min.';
+  if(!pos(S.Qh)||!pos(S.Qv))return 'Průtok hydrantu i průtok při vypouštění musí být větší než 0.';
+  if(!nn(S.th)||!nn(S.tf))return 'Manipulační časy nesmí být záporné.';
+  if(!nn(S.d1)||!nn(S.d2))return 'Vzdálenosti nesmí být záporné.';
+  for(let i=0;i<S.tk.length;i++){const t=S.tk[i];if(!pos(t.V)||!pos(t.v1)||!pos(t.v2))return `CAS ${i+1}: objem i obě rychlosti musí být větší než 0.`;}
+  return '';
+}
+function params(){
+  return {Vs:S.Vs,Qh:S.Qh/60,Qv:S.Qv/60,th:S.th*60,tf:S.tf*60,d1:S.d1*1000,d2:S.d2*1000,start:S.start,
+    tk:S.tk.map(t=>({V:t.V,v1:t.v1/3.6,v2:t.v2/3.6}))};
+}
+
+let P=null,R=null,sust=0,unintQ=0,play={t:0,on:false,last:0};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function compute(){
+  readForm();
+  ['Q','Qh','Qv'].forEach(k=>{$(k+'-h').textContent=Number.isFinite(S[k])?'= '+nf(S[k]/60,1)+' l/s':'';});
+  const e=validate();$('err').hidden=!e;$('err').textContent=e;
+  if(e)return;
+  P=params();const T=S.T*60;
+  sust=sustainable(P);
+  const un=maxUninterrupted(P,T),b=bounds(P);
+  R=simulate(P,S.Q/60,T,{record:true,dt:T>21600?2:1});
+
+  $('r-sust').innerHTML=nf(sust*60)+'<small>l/min</small>';
+  const lim=[['hydrant',b.hyd],['výdej u požáru',b.dump],['doba jízdy a počet CAS',b.noQ]].sort((a,c)=>a[1]-c[1])[0];
+  $('r-sust-sub').textContent=nf(sust,1)+' l/s · omezuje: '+lim[0];
+  $('r-unint-h').textContent='Dostupný průtok bez přerušení po dobu '+nf(S.T)+' min';
+  $('r-unint-sub').textContent=nf(Math.floor(un*600)/10,1)+' l/s · stojící CAS se nevyprázdní';unintQ=un;
+  $('r-unint').innerHTML=nf(Math.floor(un*60))+'<small>l/min</small>';
+  $('r-set-h').textContent='Zadaný průtok '+nf(S.Q)+' l/min';
+  const ok=R.deficit===0,pill=$('r-pill');
+  pill.className='pill '+(ok?'ok':'bad');pill.textContent=ok?'Pokryto po celou dobu':'Dodávka se přeruší';
+  const kv=[];
+  if(!ok){kv.push(['První přerušení v čase',hms(R.first)]);kv.push(['Celkem bez vody',mins(R.deficit)]);}
+  kv.push(['Nejnižší zásoba ve stojící CAS',nf(R.minL)+' l']);
+  kv.push(['Voda dodaná na hašení',nf(R.used/1000,1)+' m³']);
+  kv.push(['Vytížení hydrantu',nf(100*R.hBusy/R.T)+' %']);
+  $('r-kv').innerHTML=kv.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
+
+  const rows=[['Hydrant (plnění a manipulace)',b.hyd],['Výdej u požáru (vypouštění a manipulace)',b.dump],['Cykly CAS bez čekání',b.noQ]];
+  const minB=Math.min(b.hyd,b.dump,b.noQ);
+  $('bounds').innerHTML='<tr><th>Mez</th><th>l/min</th><th>l/s</th></tr>'+
+    rows.map(r=>`<tr class="${r[1]===minB?'limit':''}"><td>${r[0]}${r[1]===minB?' · úzké místo':''}</td><td>${nf(r[1]*60)}</td><td>${nf(r[1],1)}</td></tr>`).join('')+
+    `<tr class="sim"><td>Simulace, ustálený stav</td><td>${nf(sust*60)}</td><td>${nf(sust,1)}</td></tr>`;
+  $('tktable').innerHTML='<tr><th>CAS</th><th>Objem</th><th>Cyklus bez čekání</th><th>Otočky</th><th>Čekání u hydrantu</th><th>Čekání u požáru</th></tr>'+
+    P.tk.map((t,i)=>`<tr><td>${i+1}</td><td>${nf(t.V)} l</td><td>${mins(noWaitCycle(P,t))}</td><td>${nf(R.trips[i])}</td><td>${mins(R.waitH[i])}</td><td>${mins(R.waitF[i])}</td></tr>`).join('');
+  $('chart-sub').textContent='při průtoku '+nf(S.Q)+' l/min';
+
+  play.t=0;play.on=!reduce;play.last=0;$('play').textContent=play.on?'Pozastavit':'Přehrát';
+  drawChartStatic();render();
+  if(play.on)requestAnimationFrame(tick);
+}
+
+/* ---------- kreslení ---------- */
+let C={};
+function colors(){const cs=getComputedStyle(document.documentElement);
+  ['bg','surface','ink','muted','line','water','water-soft','fire','warn','ok','drive','road'].forEach(k=>C[k]=cs.getPropertyValue('--'+k).trim());}
+function fit(cv,h){const dpr=window.devicePixelRatio||1,w=cv.clientWidth||300;cv.style.height=h+'px';cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);return [c,w];}
+function rr(c,x,y,w,h,r){c.beginPath();if(c.roundRect)c.roundRect(x,y,w,h,r);else c.rect(x,y,w,h);}
+const FONT=(px,wt=400)=>`${wt} ${px}px "IBM Plex Sans",system-ui,sans-serif`;
+
+function drawScene(){
+  const cv=$('scene'),H=190,[c,W]=fit(cv,H);
+  if(!R)return;
+  const k=Math.min(R.steps,Math.floor(play.t/R.dt)),n=R.n,rec=R.rec;
+  const xL=74,xR=W-50,y1=74,y2=112,tw=26,th=14;
+  // silnice
+  c.fillStyle=C.road;rr(c,xL-8,y1-18,xR-xL+16,y2-y1+36,8);c.fill();
+  c.strokeStyle=C.muted;c.globalAlpha=.5;c.setLineDash([7,7]);c.lineWidth=1;c.beginPath();c.moveTo(xL,(y1+y2)/2);c.lineTo(xR,(y1+y2)/2);c.stroke();c.setLineDash([]);c.globalAlpha=1;
+  c.font=FONT(11);c.fillStyle=C.muted;c.textAlign='center';
+  c.fillText('prázdné k hydrantu →',(xL+xR)/2,y1-26);
+  c.fillText('← plné k požáru',(xL+xR)/2,y2+38);
+  // stojící CAS
+  const L=rec.lev[k],gx=16,gy=58,gw=36,gh=70,def=rec.def[k]||(L<=0&&S.Q>0&&k>0&&rec.def[Math.min(R.steps,k+1)]);
+  c.fillStyle=C.surface;rr(c,gx,gy,gw,gh,4);c.fill();
+  const lh=gh*Math.min(1,L/P.Vs);c.fillStyle=C.water;c.fillRect(gx,gy+gh-lh,gw,lh);
+  c.lineWidth=1.5;c.strokeStyle=def?C.fire:C.ink;rr(c,gx,gy,gw,gh,4);c.stroke();
+  c.textAlign='left';c.fillStyle=C.ink;c.font=FONT(11,600);c.fillText('Stojící CAS',6,gy+gh+16);
+  c.font=FONT(11);c.fillStyle=C.muted;c.fillText(nf(L)+' l',6,gy+gh+31);
+  // plamen
+  c.fillStyle=C.fire;c.globalAlpha=def?.3:1;c.beginPath();c.moveTo(34,12);c.bezierCurveTo(48,26,46,44,34,46);c.bezierCurveTo(20,44,22,30,28,26);c.bezierCurveTo(30,30,32,30,34,12);c.fill();c.globalAlpha=1;
+  c.font=FONT(11,600);c.fillStyle=def?C.fire:C.ink;c.fillText(def?'hašení bez vody':'hašení '+nf(S.Q)+' l/min',54,34);
+  // hydrant
+  const hx=W-30;c.fillStyle=C.water;rr(c,hx-6,y1+4,12,y2-y1+2,2);c.fill();rr(c,hx-9,y1-2,18,7,3);c.fill();c.fillRect(hx-11,y1+18,22,5);
+  c.textAlign='right';c.fillStyle=C.ink;c.font=FONT(11,600);c.fillText('Hydrant',W-6,gy+gh+16);
+  c.font=FONT(11);c.fillStyle=C.muted;c.fillText(nf(S.Qh)+' l/min',W-6,gy+gh+31);
+  // CAS
+  c.textAlign='center';
+  for(let i=0;i<n;i++){
+    const b=k*n+i,s=rec.st[b],sl=rec.slot[b];let x,y;
+    if(s===0){x=xL+tw/2+rec.pos[b]*(xR-xL-tw);y=y1;}
+    else if(s<4){x=xR-tw/2-sl*(tw+3);y=y1;}
+    else if(s===4){x=xL+tw/2+rec.pos[b]*(xR-xL-tw);y=y2;}
+    else{x=xL+tw/2+sl*(tw+3);y=y2;}
+    if(s===3){c.strokeStyle=C.water;c.lineWidth=2.5;c.beginPath();c.moveTo(x+tw/2,y);c.lineTo(hx-6,y+6);c.stroke();}
+    if(s===7){c.strokeStyle=C.water;c.lineWidth=2.5;c.beginPath();c.moveTo(x-tw/2,y);c.lineTo(gx+gw,y);c.stroke();}
+    c.fillStyle=C.surface;rr(c,x-tw/2,y-th/2,tw,th,3);c.fill();
+    c.save();rr(c,x-tw/2,y-th/2,tw,th,3);c.clip();c.fillStyle=C.water;c.fillRect(x-tw/2,y-th/2,tw*rec.w[b]/P.tk[i].V,th);c.restore();
+    c.lineWidth=1.25;c.strokeStyle=(s===1||s===5)?C.warn:C.ink;rr(c,x-tw/2,y-th/2,tw,th,3);c.stroke();
+    c.font=FONT(10,600);c.fillStyle=C.ink;c.fillText(String(i+1),x,y===y1?y-th/2-3:y+th/2+11);
+  }
+}
+
+let chartBase=null,chartGeo=null;
+function drawChartStatic(){
+  if(!R)return;
+  const cv=$('chart'),n=R.n,top=10,ph=120,gap=16,rowH=11,rowG=4,axis=24;
+  const H=top+ph+gap+n*(rowH+rowG)+axis,[c,W]=fit(cv,H),ml=46,mr=10,pw=W-ml-mr,rec=R.rec,steps=R.steps;
+  chartGeo={ml,pw,H,W};
+  const X=t=>ml+pw*t/R.T,Y=v=>top+ph*(1-v/P.Vs);
+  c.font=FONT(11);c.textBaseline='middle';
+  // osa y
+  c.textAlign='right';
+  [0,.5,1].forEach(f=>{const y=Y(P.Vs*f);c.strokeStyle=C.line;c.lineWidth=1;c.beginPath();c.moveTo(ml,y+.5);c.lineTo(ml+pw,y+.5);c.stroke();c.fillStyle=C.muted;c.fillText(nf(P.Vs*f),ml-6,y);});
+  // osa x
+  const Tm=R.T/60,maxT=W<520?5:9,stp=[1,2,5,10,15,20,30,60,120,180,240].find(s=>Tm/s<=maxT)||360;
+  c.textAlign='center';
+  for(let m=0;m<=Tm+1e-6;m+=stp){const x=X(m*60);c.strokeStyle=C.line;c.beginPath();c.moveTo(x+.5,top);c.lineTo(x+.5,H-axis+2);c.stroke();c.fillStyle=C.muted;c.fillText(nf(m),x,H-axis+12);}
+  c.textAlign='right';c.fillText('min',W-2,H-4);
+  // hladina
+  const cols=Math.max(1,Math.floor(pw)),mn=new Float32Array(cols),mx=new Float32Array(cols),df=new Uint8Array(cols);
+  for(let j=0;j<cols;j++){const a=Math.floor(j*steps/cols),b=Math.max(a+1,Math.floor((j+1)*steps/cols));let lo=Infinity,hi=-Infinity,d=0;
+    for(let k=a;k<=b&&k<=steps;k++){const v=rec.lev[k];if(v<lo)lo=v;if(v>hi)hi=v;if(rec.def[k])d=1;}mn[j]=lo;mx[j]=hi;df[j]=d;}
+  c.beginPath();c.moveTo(ml,Y(0));for(let j=0;j<cols;j++)c.lineTo(ml+j+.5,Y(mn[j]));c.lineTo(ml+cols,Y(0));c.closePath();c.fillStyle=C['water-soft'];c.fill();
+  c.beginPath();for(let j=0;j<cols;j++){const x=ml+j+.5;if(j===0)c.moveTo(x,Y(mx[j]));else c.lineTo(x,Y(mx[j]));c.lineTo(x,Y(mn[j]));}
+  c.strokeStyle=C.water;c.lineWidth=1.5;c.lineJoin='round';c.stroke();
+  c.fillStyle=C.fire;for(let j=0;j<cols;j++)if(df[j])c.fillRect(ml+j,Y(0)-4,1,5);
+  // činnost CAS
+  const cat=s=>(s===0||s===4)?C.drive:(s===1||s===5)?C.warn:s<4?C.water:C.ok;
+  for(let i=0;i<n;i++){
+    const y=top+ph+gap+i*(rowH+rowG);
+    c.textAlign='right';c.fillStyle=C.muted;c.fillText('CAS '+(i+1),ml-6,y+rowH/2);
+    let run=0,cur=null;
+    for(let j=0;j<=cols;j++){
+      const col=j<cols?cat(rec.st[Math.min(steps,Math.floor((j+.5)*steps/cols))*n+i]):null;
+      if(col!==cur){if(cur){c.fillStyle=cur;c.fillRect(ml+run,y,j-run,rowH);}cur=col;run=j;}
+    }
+  }
+  chartBase=document.createElement('canvas');chartBase.width=cv.width;chartBase.height=cv.height;chartBase.getContext('2d').drawImage(cv,0,0);
+}
+function drawChart(){
+  if(!chartBase||!R)return;
+  const cv=$('chart'),c=cv.getContext('2d'),g=chartGeo;
+  c.save();c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,cv.width,cv.height);c.drawImage(chartBase,0,0);c.restore();
+  const x=g.ml+g.pw*play.t/R.T;c.strokeStyle=C.ink;c.lineWidth=1.5;c.beginPath();c.moveTo(x,6);c.lineTo(x,g.H-22);c.stroke();
+}
+function render(){
+  if(!R)return;
+  drawScene();drawChart();
+  $('clock').textContent=hms(play.t);
+  $('seek').value=Math.round(1000*play.t/R.T);
+}
+function tick(ts){
+  if(!play.on||!R)return;
+  if(play.last)play.t+=Math.min(.1,(ts-play.last)/1000)*(+$('speed').value);
+  play.last=ts;
+  if(play.t>=R.T){play.t=R.T;play.on=false;$('play').textContent='Přehrát znovu';}
+  render();
+  if(play.on)requestAnimationFrame(tick);
+}
+
+/* ---------- události ---------- */
+let deb=0;
+const schedule=()=>{clearTimeout(deb);deb=setTimeout(compute,200);};
+$('form').addEventListener('input',schedule);
+$('form').addEventListener('submit',e=>e.preventDefault());
+$('tks').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;readForm();S.tk.splice(+b.dataset.rm,1);buildTankers();compute();});
+$('add').addEventListener('click',()=>{readForm();const l=S.tk[S.tk.length-1];S.tk.push({V:l.V,v1:l.v1,v2:l.v2});buildTankers();compute();});
+$('reset').addEventListener('click',()=>{S=JSON.parse(JSON.stringify(DEF));fillForm();compute();});
+$('useSust').addEventListener('click',()=>{if(unintQ>0){$('Q').value=Math.floor(unintQ*60);compute();}});
+$('play').addEventListener('click',()=>{
+  if(!R)return;
+  if(!play.on&&play.t>=R.T)play.t=0;
+  play.on=!play.on;play.last=0;$('play').textContent=play.on?'Pozastavit':'Přehrát';
+  if(play.on)requestAnimationFrame(tick);
+});
+$('seek').addEventListener('input',e=>{if(!R)return;play.t=R.T*e.target.value/1000;play.last=0;drawScene();drawChart();$('clock').textContent=hms(play.t);});
+const redraw=()=>{colors();drawChartStatic();render();};
+let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(redraw,120);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw);
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
+
+colors();fillForm();compute();
+</script>
+
+</body></html>
