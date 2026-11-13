@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Izoplochy sálání z oken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Rozvržení: vlevo zadání, vpravo výkres (3D / půdorys / bokorys), pod ním výsledky. Vzhled technického výkresu. */
+  --paper: #eceeea;
+  --panel: #fafbf8;
+  --stage: #f5f6f2;
+  --ink: #1a1f23;
+  --muted: #5a646a;
+  --line: #cdd2cc;
+  --line-soft: #e1e5df;
+  --accent: #0d5c75;
+  --accent-ink: #ffffff;
+  --fire: #ee6416;
+  --warn: #b3261e;
+  --wall: #b4bbb4;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #111518; --panel: #192024; --stage: #151a1d; --ink: #e3e7e2; --muted: #97a2a7;
+    --line: #353e43; --line-soft: #262e32; --accent: #62bfdc; --accent-ink: #0b1418;
+    --fire: #ff8a3d; --warn: #ff8a80; --wall: #4c565b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111518; --panel: #192024; --stage: #151a1d; --ink: #e3e7e2; --muted: #97a2a7;
+  --line: #353e43; --line-soft: #262e32; --accent: #62bfdc; --accent-ink: #0b1418;
+  --fire: #ff8a3d; --warn: #ff8a80; --wall: #4c565b;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.45 var(--font-body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.app { display: grid; grid-template-columns: 384px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+header.top { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header.top h1 { font: 600 21px/1.15 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.sum { display: flex; flex-wrap: wrap; gap: 4px 22px; font-variant-numeric: tabular-nums; }
+.sum div { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.sum dt, .sum .k { color: var(--muted); font-size: 12px; }
+.sum b { font: 500 15px var(--font-mono); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; align-self: center; }
+
+aside.inputs { overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 4px 18px 28px; }
+.grp { padding: 16px 0 16px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 10px; }
+.grp:last-child { border-bottom: 0; }
+.grp h2 { font: 600 12px/1.2 var(--font-display); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.row label { flex: 1; min-width: 0; }
+.inp { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.inp i { font-style: normal; color: var(--muted); font-size: 12px; min-width: 30px; }
+input[type="text"] { width: 76px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); font: 13px var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+input[type="text"]:hover { border-color: var(--muted); }
+input[aria-invalid="true"] { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+select { padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); max-width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; background: var(--paper); }
+.seg button { border: 0; background: transparent; padding: 5px 11px; cursor: pointer; border-right: 1px solid var(--line); white-space: nowrap; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--line-soft); }
+.readout { font: 13px var(--font-mono); padding: 8px 10px; border-left: 3px solid var(--fire); background: var(--paper); border-radius: 0 4px 4px 0; font-variant-numeric: tabular-nums; }
+.readout small { display: block; font: 12px var(--font-body); color: var(--muted); }
+.hint { color: var(--muted); font-size: 12px; margin: 0; }
+.warnbox { color: var(--warn); font-size: 12.5px; margin: 0; padding-left: 16px; }
+.warnbox:empty { display: none; }
+
+.floor { border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); }
+.floor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.floor-head strong { font: 600 14px var(--font-display); }
+table.wins { border-collapse: collapse; width: 100%; }
+table.wins th { font: 400 11.5px var(--font-body); color: var(--muted); text-align: right; padding: 0 2px 3px; }
+table.wins th:first-child, table.wins td:first-child { text-align: left; width: 18px; color: var(--muted); font: 12px var(--font-mono); }
+table.wins td { padding: 2px; }
+table.wins input[type="text"] { width: 100%; min-width: 0; padding: 4px 5px; }
+table.wins td.act { width: 50px; white-space: nowrap; text-align: right; }
+.ib { border: 1px solid transparent; background: transparent; border-radius: 4px; width: 22px; height: 24px; padding: 0; cursor: pointer; color: var(--muted); line-height: 1; }
+.ib:hover { border-color: var(--line); color: var(--ink); background: var(--paper); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.pri:hover { color: var(--accent-ink); filter: brightness(1.1); }
+details.gen { border-top: 1px dashed var(--line); padding-top: 6px; }
+details.gen summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+.gen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 8px 0; }
+.gen-grid label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12.5px; }
+.gen-grid input[type="text"] { width: 62px; }
+
+.levels { display: flex; flex-direction: column; gap: 6px; }
+.level { display: flex; align-items: center; gap: 8px; }
+.level .note { color: var(--muted); font-size: 12px; flex: 1; }
+
+main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.viewbar .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; }
+.viewbar .tools label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.viewbar output { font: 13px var(--font-mono); color: var(--ink); min-width: 62px; }
+input[type="range"] { accent-color: var(--accent); width: 150px; }
+.stage { position: relative; flex: 1; min-height: 340px; background: var(--stage); overflow: hidden; }
+.stage > .pane { position: absolute; inset: 0; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#gl-labels { cursor: grab; }
+#gl-labels:active { cursor: grabbing; }
+.legend3d { position: absolute; left: 14px; top: 12px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; }
+.legend3d label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.legend3d .cap { color: var(--muted); font-size: 11.5px; }
+.help3d { position: absolute; left: 14px; bottom: 10px; color: var(--muted); font-size: 11.5px; pointer-events: none; }
+.pane svg { display: block; width: 100%; height: 100%; }
+.tip { position: absolute; pointer-events: none; padding: 5px 8px; background: var(--ink); color: var(--panel); border-radius: 4px; font: 12px/1.35 var(--font-mono); white-space: nowrap; transform: translate(12px, 12px); z-index: 3; }
+.progress { position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 4; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s linear; }
+.status { position: absolute; right: 14px; top: 10px; z-index: 4; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 88%, transparent); padding: 2px 8px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--muted); z-index: 2; background: var(--stage); }
+
+.results { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 20px 14px; display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: flex-start; }
+.tblwrap { overflow-x: auto; max-width: 100%; }
+table.res { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.res th { font: 400 12px var(--font-body); color: var(--muted); text-align: right; padding: 2px 0 5px 18px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.res td { font: 13px var(--font-mono); text-align: right; padding: 5px 0 5px 18px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+table.res th:first-child, table.res td:first-child { text-align: left; padding-left: 0; }
+table.res td:first-child { display: flex; align-items: center; gap: 7px; }
+table.res td.d { font-weight: 600; }
+.probe { display: flex; flex-direction: column; gap: 7px; min-width: 240px; }
+.probe h3 { font: 600 12px/1.2 var(--font-display); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 8px; }
+.probe .xyz { display: flex; gap: 8px; flex-wrap: wrap; }
+.probe .xyz label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; }
+.probe .xyz input[type="text"] { width: 62px; }
+.probe .q { font: 500 17px var(--font-mono); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { font: 500 11.5px var(--font-body); padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.ok { color: var(--muted); }
+.pill.hot { color: var(--warn); }
+.note-foot { flex-basis: 100%; color: var(--muted); font-size: 12px; margin: 0; max-width: 100ch; }
+
+/* výkres (SVG) – stejné třídy mají při exportu pevné barvy */
+.v-bg { fill: var(--stage); }
+.v-plot { fill: var(--panel); stroke: var(--line); }
+.v-ink { fill: var(--ink); }
+.v-mut { fill: var(--muted); }
+.v-g1 { stroke: var(--line-soft); }
+.v-g2 { stroke: var(--line); }
+.v-wall { stroke: var(--ink); }
+.v-hatch { stroke: var(--muted); }
+.v-win { stroke: var(--fire); }
+.v-ax { stroke: var(--muted); }
+.v-sb0 { fill: var(--ink); stroke: var(--ink); }
+.v-sb1 { fill: var(--panel); stroke: var(--ink); }
+.v-probe { stroke: var(--ink); fill: none; }
+.pane svg text { font-family: var(--font-body); }
+
+@media (max-width: 920px) {
+  html, body { height: auto; }
+  .app { display: block; height: auto; }
+  aside.inputs { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; padding: 4px 16px 20px; }
+  .stage { height: 68vh; min-height: 380px; flex: none; }
+  header.top, .viewbar, .results { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Izoplochy sálání z oken požárního úseku</h1>
+    <div class="sum" id="sum"></div>
+  </header>
+
+  <aside class="inputs" id="inputs">
+    <section class="grp">
+      <h2>Zdroj sálání</h2>
+      <div class="seg" id="seg-src" role="group" aria-label="Způsob zadání teploty">
+        <button type="button" data-act="src-mode" data-v="curve">Normová křivka</button>
+        <button type="button" data-act="src-mode" data-v="temp">Teplota plynů</button>
+      </div>
+      <div class="row" id="row-tau">
+        <label for="in-tau">Ekvivalentní doba trvání požáru τ<sub>e</sub></label>
+        <span class="inp"><input type="text" inputmode="decimal" id="in-tau" data-k="src.tau" data-min="0.1" data-max="1000"><i>min</i></span>
+      </div>
+      <div class="row" id="row-T">
+        <label for="in-T">Teplota plynů v požárním úseku</label>
+        <span class="inp"><input type="text" inputmode="decimal" id="in-T" data-k="src.T" data-min="20" data-max="2000"><i>°C</i></span>
+      </div>
+      <div class="row">
+        <label for="in-eps">Emisivita ε</label>
+        <span class="inp"><input type="text" inputmode="decimal" id="in-eps" data-k="src.eps" data-min="0.01" data-max="1"><i>–</i></span>
+      </div>
+      <div class="readout" id="ro-src"></div>
+    </section>
+
+    <section class="grp">
+      <h2>Fasáda a okna</h2>
+      <div class="row">
+        <span id="lbl-nf">Počet podlaží požárního úseku</span>
+        <div class="seg" id="seg-nf" role="group" aria-labelledby="lbl-nf">
+          <button type="button" data-act="nf" data-v="1">1</button>
+          <button type="button" data-act="nf" data-v="2">2</button>
+          <button type="button" data-act="nf" data-v="3">3</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="in-L">Délka fasády</label>
+        <span class="inp"><input type="text" inputmode="decimal" id="in-L" data-k="L" data-min="0.5" data-max="500"><i>m</i></span>
+      </div>
+      <div class="row">
+        <label for="in-base">Podlaha 1. podlaží nad terénem</label>
+        <span class="inp"><input type="text" inputmode="decimal" id="in-base" data-k="base" data-min="0" data-max="100"><i>m</i></span>
+      </div>
+      <p class="hint">x je vzdálenost levé hrany okna od levého okraje fasády při pohledu zvenku. Parapet se měří od podlahy podlaží. Rozměry v metrech.</p>
+      <div id="floors" style="display:flex;flex-direction:column;gap:10px"></div>
+      <ul class="warnbox" id="warn"></ul>
+    </section>
+
+    <section class="grp">
+      <h2>Izoplochy</h2>
+      <div class="levels" id="levels"></div>
+      <div class="btns"><button type="button" class="btn" data-act="add-level" id="btn-add-level">Přidat hladinu</button></div>
+      <p class="hint">18,5 kW/m² je kritická hustota tepelného toku, se kterou pracuje ČSN 73 0802 při stanovení odstupových vzdáleností.</p>
+    </section>
+
+    <section class="grp">
+      <h2>Ozařovaný předmět</h2>
+      <div class="row" style="flex-wrap:wrap">
+        <label for="sel-orient">Natočení ozařované plochy</label>
+        <select id="sel-orient">
+          <option value="par">rovnoběžná s fasádou</option>
+          <option value="max">nejnepříznivější natočení</option>
+          <option value="perp">svislá, kolmá k fasádě</option>
+          <option value="hor">vodorovná</option>
+        </select>
+      </div>
+      <p class="hint" id="orient-hint"></p>
+    </section>
+
+    <section class="grp">
+      <h2>Výpočetní síť</h2>
+      <div class="row">
+        <span id="lbl-res">Jemnost</span>
+        <div class="seg" id="seg-res" role="group" aria-labelledby="lbl-res">
+          <button type="button" data-act="res" data-v="56">hrubá</button>
+          <button type="button" data-act="res" data-v="88">střední</button>
+          <button type="button" data-act="res" data-v="128">jemná</button>
+        </div>
+      </div>
+      <p class="hint" id="grid-info"></p>
+      <div class="btns"><button type="button" class="btn" data-act="reset">Obnovit výchozí příklad</button></div>
+    </section>
+  </aside>
+
+  <main>
+    <div class="viewbar">
+      <div class="seg" id="seg-view" role="group" aria-label="Pohled">
+        <button type="button" data-act="view" data-v="3d">3D náhled</button>
+        <button type="button" data-act="view" data-v="plan">Půdorys</button>
+        <button type="button" data-act="view" data-v="side">Bokorys</button>
+      </div>
+      <div class="tools" id="tools-3d">
+        <div class="seg" role="group" aria-label="Směr pohledu">
+          <button type="button" data-act="cam" data-v="iso">Izometrie</button>
+          <button type="button" data-act="cam" data-v="front">Zepředu</button>
+          <button type="button" data-act="cam" data-v="top">Shora</button>
+          <button type="button" data-act="cam" data-v="left">Zleva</button>
+        </div>
+        <label for="rng-alpha">Průhlednost <input type="range" id="rng-alpha" min="0.15" max="1" step="0.05" value="0.55"></label>
+      </div>
+      <div class="tools" id="tools-2d" hidden>
+        <div class="seg" id="seg-2dmode" role="group" aria-label="Způsob zobrazení">
+          <button type="button" data-act="mode2d" data-v="env">Průmět</button>
+          <button type="button" data-act="mode2d" data-v="cut">Řez</button>
+        </div>
+        <label for="rng-cut" id="lbl-cut"><span id="cut-name">Výška řezu z</span> <input type="range" id="rng-cut" min="0" max="10" step="0.05" value="1"><output id="out-cut" for="rng-cut"></output></label>
+        <label for="sel-scale">Měřítko výkresu
+          <select id="sel-scale"><option value="50">1 : 50</option><option value="100" selected>1 : 100</option><option value="200">1 : 200</option><option value="500">1 : 500</option></select>
+        </label>
+        <button type="button" class="btn pri" data-act="export" id="btn-export">Stáhnout SVG</button>
+        <span id="export-msg" class="hint" role="status"></span>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="progress" id="progress" hidden><i></i></div>
+      <div class="status" id="status" hidden></div>
+      <div class="pane" id="pane-3d">
+        <canvas id="gl"></canvas>
+        <canvas id="gl-labels" aria-label="Prostorový náhled izoploch. Tažením otáčíte, kolečkem přibližujete."></canvas>
+        <div class="legend3d" id="legend3d"></div>
+        <div class="help3d">tažení: otáčení · Shift + tažení: posun · kolečko: přiblížení<br>mřížka terénu 1 m</div>
+      </div>
+      <div class="pane" id="pane-2d" hidden>
+        <div id="svg-host" style="position:absolute;inset:0"></div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+
+    <div class="results">
+      <div class="tblwrap"><table class="res" id="res"></table></div>
+      <div class="probe">
+        <h3><input type="checkbox" id="chk-probe"><label for="chk-probe">Kontrolní bod P</label></h3>
+        <div class="xyz">
+          <label for="in-px">x <input type="text" inputmode="decimal" id="in-px" data-k="probe.x" data-min="-1000" data-max="1000"></label>
+          <label for="in-py">y <input type="text" inputmode="decimal" id="in-py" data-k="probe.y" data-min="0" data-max="1000"></label>
+          <label for="in-pz">z <input type="text" inputmode="decimal" id="in-pz" data-k="probe.z" data-min="0" data-max="1000"></label>
+        </div>
+        <div class="q" id="probe-q"></div>
+        <p class="hint">y je vzdálenost od fasády, z výška nad terénem.</p>
+      </div>
+      <p class="note-foot">Okna sálají jako rovnoměrné plochy s hustotou toku I = ε·σ·T⁴. Dopadající tok q = I·φ, kde φ je polohový součinitel spočtený přesným konturovým integrálem přes obrysy oken. Bez vlivu plamenů vyšlehávajících z oken, větru a stínění. Výpočetní pomůcka, která nenahrazuje posouzení podle normy.</p>
+    </div>
+  </main>
+</div>
+<script>
+function CORE() {
+  'use strict';
+  // Souřadnice: x podél fasády (zleva při pohledu zvenku), y kolmo od fasády, z svisle nad terénem.
+  // Okna leží v rovině y = 0 a sálají do poloprostoru y > 0.
+  var SIGMA = 5.670374e-8;
+  var TWO_PI = 2 * Math.PI;
+
+  function normTemp(tau) { return 20 + 345 * Math.log10(8 * tau + 1); }
+  function emissive(Tc, eps) { return eps * SIGMA * Math.pow(Tc + 273.15, 4) / 1000; } // kW/m2
+
+  // pracovní pole
+  var R = new Float64Array(12);      // 4 vrcholy okna vůči bodu
+  var C = new Float64Array(18);      // oříznutý mnohoúhelník (max 6 vrcholů)
+  var acc = [0, 0, 0];
+
+  function edge(ax, ay, az, bx, by, bz) {
+    var cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+    var cl = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    if (cl < 1e-300) return;
+    var k = Math.atan2(cl, ax * bx + ay * by + az * bz) / cl;
+    acc[0] += k * cx; acc[1] += k * cy; acc[2] += k * cz;
+  }
+
+  function loadR(px, py, pz, w) {
+    var ax = w.x0 - px, bx = w.x1 - px, y = -py, az = w.z0 - pz, bz = w.z1 - pz;
+    R[0] = ax; R[1] = y; R[2] = az;
+    R[3] = bx; R[4] = y; R[5] = az;
+    R[6] = bx; R[7] = y; R[8] = bz;
+    R[9] = ax; R[10] = y; R[11] = bz;
+  }
+
+  // vektor ozáření celého okna (do acc se přičítá, bez dělení 2π)
+  function wholeVec() {
+    edge(R[0], R[1], R[2], R[3], R[4], R[5]);
+    edge(R[3], R[4], R[5], R[6], R[7], R[8]);
+    edge(R[6], R[7], R[8], R[9], R[10], R[11]);
+    edge(R[9], R[10], R[11], R[0], R[1], R[2]);
+  }
+
+  // přičte do acc vektor části okna viditelné z plošky s normálou n (ořez rovinou horizontu)
+  function visibleVec(nx, ny, nz) {
+    var s0 = nx * R[0] + ny * R[1] + nz * R[2];
+    var s1 = nx * R[3] + ny * R[4] + nz * R[5];
+    var s2 = nx * R[6] + ny * R[7] + nz * R[8];
+    var s3 = nx * R[9] + ny * R[10] + nz * R[11];
+    if (s0 >= 0 && s1 >= 0 && s2 >= 0 && s3 >= 0) { wholeVec(); return; }
+    if (s0 <= 0 && s1 <= 0 && s2 <= 0 && s3 <= 0) return;
+    var S = [s0, s1, s2, s3], m = 0, i, j, t;
+    for (i = 0; i < 4; i++) {
+      j = (i + 1) & 3;
+      var a = S[i], b = S[j];
+      if (a >= 0) { C[m * 3] = R[i * 3]; C[m * 3 + 1] = R[i * 3 + 1]; C[m * 3 + 2] = R[i * 3 + 2]; m++; }
+      if ((a > 0 && b < 0) || (a < 0 && b > 0)) {
+        t = a / (a - b);
+        C[m * 3] = R[i * 3] + t * (R[j * 3] - R[i * 3]);
+        C[m * 3 + 1] = R[i * 3 + 1] + t * (R[j * 3 + 1] - R[i * 3 + 1]);
+        C[m * 3 + 2] = R[i * 3 + 2] + t * (R[j * 3 + 2] - R[i * 3 + 2]);
+        m++;
+      }
+    }
+    if (m < 3) return;
+    for (i = 0; i < m; i++) {
+      j = (i + 1) % m;
+      edge(C[i * 3], C[i * 3 + 1], C[i * 3 + 2], C[j * 3], C[j * 3 + 1], C[j * 3 + 2]);
+    }
+  }
+
+  // ozáření plošky s normálou n od všech oken; výsledný vektor zůstává v acc
+  function dirFlux(px, py, pz, wins, nx, ny, nz) {
+    acc[0] = acc[1] = acc[2] = 0;
+    for (var i = 0; i < wins.length; i++) { loadR(px, py, pz, wins[i]); visibleVec(nx, ny, nz); }
+    return (nx * acc[0] + ny * acc[1] + nz * acc[2]) / TWO_PI;
+  }
+
+  // polohový součinitel v bodě (bez násobení I). mode: par | max | perp | hor
+  function factor(px, py, pz, wins, mode) {
+    if (py < 1e-4) py = 1e-4;
+    var i, f;
+    if (mode === 'par') {
+      acc[0] = acc[1] = acc[2] = 0;
+      for (i = 0; i < wins.length; i++) { loadR(px, py, pz, wins[i]); wholeVec(); }
+      return -acc[1] / TWO_PI;
+    }
+    if (mode === 'perp') {
+      f = dirFlux(px, py, pz, wins, 1, 0, 0);
+      return Math.max(f, dirFlux(px, py, pz, wins, -1, 0, 0));
+    }
+    if (mode === 'hor') {
+      f = dirFlux(px, py, pz, wins, 0, 0, 1);
+      return Math.max(f, dirFlux(px, py, pz, wins, 0, 0, -1));
+    }
+    // max: nejnepříznivější natočení plošky – iterace n <- F(viditelná část)/|F|
+    var N = wins.length;
+    if (RA.length < N * 12) { RA = new Float64Array(N * 12); VA = new Float64Array(N * 3); }
+    var tx = 0, ty = 0, tz = 0, bl = -1, bx = 0, by = 0, bz = 0, sum = 0, l, q;
+    for (i = 0; i < N; i++) {
+      acc[0] = acc[1] = acc[2] = 0;
+      loadR(px, py, pz, wins[i]); wholeVec();
+      for (q = 0; q < 12; q++) RA[i * 12 + q] = R[q];
+      VA[i * 3] = acc[0]; VA[i * 3 + 1] = acc[1]; VA[i * 3 + 2] = acc[2];
+      l = Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]);
+      sum += l;
+      if (l > bl) { bl = l; bx = acc[0]; by = acc[1]; bz = acc[2]; }
+      tx += acc[0]; ty += acc[1]; tz += acc[2];
+    }
+    var tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    if (tl < 1e-300) return 0;
+    var g = ascendC(N, tx / tl, ty / tl, tz / tl);
+    if (N > 1 && tl < sum * (1 - 1e-6) && bl > 0) {
+      var g2 = ascendC(N, bx / bl, by / bl, bz / bl);
+      if (g2 > g) g = g2;
+    }
+    return g;
+  }
+
+  var RA = new Float64Array(0), VA = new Float64Array(0);
+  // totéž co dirFlux, ale s uloženými vektory celých oken (bez opakovaných atan2)
+  function dirFluxC(N, nx, ny, nz) {
+    var ax = 0, ay = 0, az = 0, i, o, q, s, pos, neg;
+    for (i = 0; i < N; i++) {
+      o = i * 12; pos = 0; neg = 0;
+      for (q = 0; q < 12; q += 3) { s = nx * RA[o + q] + ny * RA[o + q + 1] + nz * RA[o + q + 2]; if (s > 0) pos++; else if (s < 0) neg++; }
+      if (!neg) { ax += VA[i * 3]; ay += VA[i * 3 + 1]; az += VA[i * 3 + 2]; }
+      else if (pos) {
+        for (q = 0; q < 12; q++) R[q] = RA[o + q];
+        acc[0] = acc[1] = acc[2] = 0; visibleVec(nx, ny, nz);
+        ax += acc[0]; ay += acc[1]; az += acc[2];
+      }
+    }
+    acc[0] = ax; acc[1] = ay; acc[2] = az;
+    return (nx * ax + ny * ay + nz * az) / TWO_PI;
+  }
+  function ascendC(N, nx, ny, nz) {
+    var g = dirFluxC(N, nx, ny, nz), it, l, g2;
+    for (it = 0; it < 12; it++) {
+      l = Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]);
+      if (l < 1e-300) break;
+      nx = acc[0] / l; ny = acc[1] / l; nz = acc[2] / l;
+      g2 = dirFluxC(N, nx, ny, nz);
+      if (g2 <= g * (1 + 1e-7)) { if (g2 > g) g = g2; break; }
+      g = g2;
+    }
+    return g;
+  }
+
+  // ---------- výpočetní oblast ----------
+  function srcBox(wins) {
+    var b = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, A: 0 };
+    wins.forEach(function (w) {
+      b.x0 = Math.min(b.x0, w.x0); b.x1 = Math.max(b.x1, w.x1);
+      b.z0 = Math.min(b.z0, w.z0); b.z1 = Math.max(b.z1, w.z1);
+      b.A += (w.x1 - w.x0) * (w.z1 - w.z0);
+    });
+    return b;
+  }
+
+  function coarseBox(wins, mode, fmin, box, n) {
+    var nx = n, ny = n, nz = n, i, j, k;
+    var dx = (box.x1 - box.x0) / (nx - 1), dy = (box.y1 - box.y0) / (ny - 1), dz = (box.z1 - box.z0) / (nz - 1);
+    var r = { x0: Infinity, x1: -Infinity, y0: 0, y1: -Infinity, z0: Infinity, z1: -Infinity, hit: false };
+    for (k = 0; k < nz; k++) for (j = 0; j < ny; j++) for (i = 0; i < nx; i++) {
+      var x = box.x0 + i * dx, y = box.y0 + j * dy, z = box.z0 + k * dz;
+      if (factor(x, y, z, wins, mode) >= fmin) {
+        r.hit = true;
+        if (x - dx < r.x0) r.x0 = x - dx; if (x + dx > r.x1) r.x1 = x + dx;
+        if (y + dy > r.y1) r.y1 = y + dy;
+        if (z - dz < r.z0) r.z0 = z - dz; if (z + dz > r.z1) r.z1 = z + dz;
+      }
+    }
+    return r;
+  }
+
+  function findDomain(wins, mode, fmin) {
+    var s = srcBox(wins);
+    var D = 1.25 * Math.sqrt(s.A / (Math.PI * fmin)) + 1;
+    var box = { x0: s.x0 - D, x1: s.x1 + D, y0: 0, y1: D, z0: Math.max(0, s.z0 - D), z1: s.z1 + D };
+    for (var pass = 0; pass < 3; pass++) {
+      var r = coarseBox(wins, mode, fmin, box, 26);
+      // vždy zahrnout okna s malým okolím
+      var m = 0.15;
+      r.x0 = Math.min(r.hit ? r.x0 : Infinity, s.x0 - m); r.x1 = Math.max(r.hit ? r.x1 : -Infinity, s.x1 + m);
+      r.z0 = Math.min(r.hit ? r.z0 : Infinity, s.z0 - m); r.z1 = Math.max(r.hit ? r.z1 : -Infinity, s.z1 + m);
+      r.y1 = Math.max(r.hit ? r.y1 : 0, 0.3);
+      box = { x0: Math.max(box.x0, r.x0), x1: Math.min(box.x1, r.x1), y0: 0, y1: Math.min(box.y1, r.y1),
+              z0: Math.max(box.z0, r.z0, 0), z1: Math.min(box.z1, r.z1) };
+    }
+    return box;
+  }
+
+  // ---------- izoplochy: marching tetrahedra ----------
+  var TETS = [[0, 5, 1, 6], [0, 1, 2, 6], [0, 2, 3, 6], [0, 3, 7, 6], [0, 7, 4, 6], [0, 4, 5, 6]];
+  var CO = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
+
+  function isoMesh(g, level) {
+    var nx = g.nx, ny = g.ny, nz = g.nz, d = g.data, nxy = nx * ny, NT = nx * ny * nz;
+    var pos = [], nrm = [], idx = [], cache = new Map();
+    var cidx = new Int32Array(8), cval = new Float64Array(8);
+    var st = { dMax: -Infinity, dAt: [0, 0, 0], xMin: Infinity, xMax: -Infinity, zMin: Infinity, zMax: -Infinity, yMin: Infinity };
+
+    function grad(n, out) {
+      var i = n % nx, j = ((n - i) / nx) % ny, k = (n - i - j * nx) / nxy;
+      var a = i > 0 ? n - 1 : n, b = i < nx - 1 ? n + 1 : n;
+      out[0] = (d[b] - d[a]) / ((b - a) * g.dx);
+      a = j > 0 ? n - nx : n; b = j < ny - 1 ? n + nx : n;
+      out[1] = (d[b] - d[a]) / (((b - a) / nx) * g.dy);
+      a = k > 0 ? n - nxy : n; b = k < nz - 1 ? n + nxy : n;
+      out[2] = (d[b] - d[a]) / (((b - a) / nxy) * g.dz);
+    }
+    var ga = [0, 0, 0], gb = [0, 0, 0];
+
+    function vert(a, b) {
+      if (a > b) { var t0 = a; a = b; b = t0; }
+      var key = a * NT + b, v = cache.get(key);
+      if (v !== undefined) return v;
+      var va = d[a], vb = d[b], t = (level - va) / (vb - va);
+      var ia = a % nx, ja = ((a - ia) / nx) % ny, ka = (a - ia - ja * nx) / nxy;
+      var ib = b % nx, jb = ((b - ib) / nx) % ny, kb = (b - ib - jb * nx) / nxy;
+      var x = g.x0 + (ia + t * (ib - ia)) * g.dx, y = g.y0 + (ja + t * (jb - ja)) * g.dy, z = g.z0 + (ka + t * (kb - ka)) * g.dz;
+      grad(a, ga); grad(b, gb);
+      var gx = -(ga[0] + t * (gb[0] - ga[0])), gy = -(ga[1] + t * (gb[1] - ga[1])), gz = -(ga[2] + t * (gb[2] - ga[2]));
+      var gl = Math.sqrt(gx * gx + gy * gy + gz * gz) || 1;
+      v = pos.length / 3;
+      pos.push(x, y, z); nrm.push(gx / gl, gy / gl, gz / gl);
+      cache.set(key, v);
+      if (y > st.dMax) { st.dMax = y; st.dAt = [x, y, z]; }
+      if (y < st.yMin) st.yMin = y;
+      if (x < st.xMin) st.xMin = x; if (x > st.xMax) st.xMax = x;
+      if (z < st.zMin) st.zMin = z; if (z > st.zMax) st.zMax = z;
+      return v;
+    }
+
+    function tri(a, b, c, pin, pout) {
+      // orientace: normála ven (od vnitřního uzlu k vnějšímu)
+      var ax = pos[a * 3], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
+      var ux = pos[b * 3] - ax, uy = pos[b * 3 + 1] - ay, uz = pos[b * 3 + 2] - az;
+      var vx = pos[c * 3] - ax, vy = pos[c * 3 + 1] - ay, vz = pos[c * 3 + 2] - az;
+      var Nx = uy * vz - uz * vy, Ny = uz * vx - ux * vz, Nz = ux * vy - uy * vx;
+      var ii = pin % nx, ji = ((pin - ii) / nx) % ny, ki = (pin - ii - ji * nx) / nxy;
+      var io = pout % nx, jo = ((pout - io) / nx) % ny, ko = (pout - io - jo * nx) / nxy;
+      var s = Nx * (io - ii) * g.dx + Ny * (jo - ji) * g.dy + Nz * (ko - ki) * g.dz;
+      if (s >= 0) idx.push(a, b, c); else idx.push(a, c, b);
+    }
+
+    var i, j, k, c, t, inside = [], outside = [];
+    for (k = 0; k < nz - 1; k++) for (j = 0; j < ny - 1; j++) for (i = 0; i < nx - 1; i++) {
+      var base = i + j * nx + k * nxy, any = 0, all = 1;
+      for (c = 0; c < 8; c++) {
+        var n = base + CO[c][0] + CO[c][1] * nx + CO[c][2] * nxy;
+        cidx[c] = n; cval[c] = d[n];
+        if (d[n] > level) any = 1; else all = 0;
+      }
+      if (!any || all) continue;
+      for (t = 0; t < 6; t++) {
+        var T = TETS[t];
+        inside.length = 0; outside.length = 0;
+        for (c = 0; c < 4; c++) { if (cval[T[c]] > level) inside.push(cidx[T[c]]); else outside.push(cidx[T[c]]); }
+        if (inside.length === 0 || inside.length === 4) continue;
+        if (inside.length === 1) {
+          tri(vert(inside[0], outside[0]), vert(inside[0], outside[1]), vert(inside[0], outside[2]), inside[0], outside[0]);
+        } else if (inside.length === 3) {
+          tri(vert(outside[0], inside[0]), vert(outside[0], inside[1]), vert(outside[0], inside[2]), inside[0], outside[0]);
+        } else {
+          var p0 = vert(inside[0], outside[0]), p1 = vert(inside[0], outside[1]);
+          var p2 = vert(inside[1], outside[1]), p3 = vert(inside[1], outside[0]);
+          tri(p0, p1, p2, inside[0], outside[0]);
+          tri(p0, p2, p3, inside[0], outside[0]);
+        }
+      }
+    }
+    return { level: level, pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx: new Uint32Array(idx), stats: st };
+  }
+
+  // ---------- izočáry: marching squares s uzavřením na okraji ----------
+  // val(i,j) pro i<nu, j<nv; vrací uzavřené smyčky [[u,v],...] ve světových souřadnicích
+  function contours(data, nu, nv, u0, du, v0, dv, level) {
+    var W = nu + 2, H = nv + 2;
+    function val(i, j) { return (i < 1 || j < 1 || i > nu || j > nv) ? -1 : data[(i - 1) + (j - 1) * nu]; }
+    function cu(i) { return u0 + Math.min(Math.max(i - 1, 0), nu - 1) * du; }
+    function cv(j) { return v0 + Math.min(Math.max(j - 1, 0), nv - 1) * dv; }
+    var pts = new Map(), adj = new Map();
+    function hkey(i, j) { return (i + j * W) * 2; }       // hrana (i,j)-(i+1,j)
+    function vkey(i, j) { return (i + j * W) * 2 + 1; }   // hrana (i,j)-(i,j+1)
+    function pt(key, i, j, horiz) {
+      if (pts.has(key)) return;
+      var a = val(i, j), b = horiz ? val(i + 1, j) : val(i, j + 1), t = (level - a) / (b - a);
+      if (horiz) pts.set(key, [cu(i) + t * (cu(i + 1) - cu(i)), cv(j)]);
+      else pts.set(key, [cu(i), cv(j) + t * (cv(j + 1) - cv(j))]);
+    }
+    function link(a, b) {
+      var l = adj.get(a); if (!l) adj.set(a, l = []); l.push(b);
+      l = adj.get(b); if (!l) adj.set(b, l = []); l.push(a);
+    }
+    var i, j;
+    for (j = 0; j < H - 1; j++) for (i = 0; i < W - 1; i++) {
+      var a = val(i, j) > level, b = val(i + 1, j) > level, c = val(i + 1, j + 1) > level, d = val(i, j + 1) > level;
+      var code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
+      if (code === 0 || code === 15) continue;
+      var eB = hkey(i, j), eR = vkey(i + 1, j), eT = hkey(i, j + 1), eL = vkey(i, j);
+      if (a !== b) pt(eB, i, j, true);
+      if (b !== c) pt(eR, i + 1, j, false);
+      if (c !== d) pt(eT, i, j + 1, true);
+      if (d !== a) pt(eL, i, j, false);
+      switch (code) {
+        case 1: case 14: link(eL, eB); break;
+        case 2: case 13: link(eB, eR); break;
+        case 4: case 11: link(eR, eT); break;
+        case 8: case 7: link(eT, eL); break;
+        case 3: case 12: link(eL, eR); break;
+        case 6: case 9: link(eB, eT); break;
+        case 5: case 10:
+          var ctr = (val(i, j) + val(i + 1, j) + val(i + 1, j + 1) + val(i, j + 1)) / 4 > level;
+          if ((code === 5) === ctr) { link(eL, eT); link(eB, eR); } else { link(eL, eB); link(eR, eT); }
+          break;
+      }
+    }
+    var loops = [], seen = new Set();
+    adj.forEach(function (_, start) {
+      if (seen.has(start)) return;
+      var loop = [], prev = -1, cur = start, guard = 0;
+      while (cur !== undefined && !seen.has(cur) && guard++ < 1e7) {
+        seen.add(cur); loop.push(pts.get(cur));
+        var l = adj.get(cur), nxt;
+        if (!seen.has(l[0])) nxt = l[0]; else if (l.length > 1 && !seen.has(l[1])) nxt = l[1];
+        else if (l.length > 2 && !seen.has(l[2])) nxt = l[2]; else if (l.length > 3 && !seen.has(l[3])) nxt = l[3];
+        else nxt = undefined;
+        prev = cur; cur = nxt;
+      }
+      if (loop.length > 2) loops.push(loop);
+    });
+    return loops;
+  }
+
+  // ---------- hlavní výpočet (generátor kvůli průběhu) ----------
+  // job: {wins:[{x0,x1,z0,z1}], I, levels:[kW/m2], mode, nMax}
+  function* solve(job) {
+    var wins = job.wins, I = job.I, mode = job.mode;
+    var lv = job.levels.filter(function (L) { return L > 0 && L < I; }).sort(function (a, b) { return a - b; });
+    if (!wins.length || !lv.length) return { empty: true, levels: [] };
+    var box = findDomain(wins, mode, lv[0] / I);
+    yield 0.04;
+    var ex = box.x1 - box.x0, ey = box.y1 - box.y0, ez = box.z1 - box.z0, h = Math.max(ex, ey, ez) / job.nMax;
+    var nx = Math.max(12, Math.round(ex / h) + 1), ny = Math.max(12, Math.round(ey / h) + 1), nz = Math.max(12, Math.round(ez / h) + 1);
+    var g = { nx: nx, ny: ny, nz: nz, x0: box.x0, y0: 0, z0: box.z0, dx: ex / (nx - 1), dy: ey / (ny - 1), dz: ez / (nz - 1), data: new Float32Array(nx * ny * nz) };
+    var plan = new Float32Array(nx * ny), side = new Float32Array(ny * nz);
+    var i, j, k, n = 0, v;
+    for (k = 0; k < nz; k++) {
+      var z = g.z0 + k * g.dz;
+      for (j = 0; j < ny; j++) {
+        var y = j * g.dy;
+        for (i = 0; i < nx; i++) {
+          v = I * factor(g.x0 + i * g.dx, y, z, wins, mode);
+          g.data[n++] = v;
+          if (v > plan[i + j * nx]) plan[i + j * nx] = v;
+          if (v > side[j + k * ny]) side[j + k * ny] = v;
+        }
+      }
+      yield 0.04 + 0.8 * (k + 1) / nz;
+    }
+    var meshes = [];
+    for (i = 0; i < lv.length; i++) {
+      meshes.push(isoMesh(g, lv[i]));
+      yield 0.84 + 0.16 * (i + 1) / lv.length;
+    }
+    return { empty: false, box: box, grid: { nx: nx, ny: ny, nz: nz, x0: g.x0, y0: 0, z0: g.z0, dx: g.dx, dy: g.dy, dz: g.dz },
+             plan: plan, side: side, levels: meshes, I: I, mode: mode };
+  }
+
+  return { SIGMA: SIGMA, normTemp: normTemp, emissive: emissive, factor: factor, solve: solve, contours: contours, isoMesh: isoMesh, findDomain: findDomain, srcBox: srcBox };
+}
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var Core = CORE();
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var LS_KEY = 'izoplochy-salani-v1';
+  var PAL = ['#d7263d', '#ef7d1a', '#d2a100', '#1f9e89', '#3b78d8'];
+  var PAL_PICK = { 1: [0], 2: [0, 4], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
+  var ORIENT = {
+    par: ['rovnoběžná s fasádou', 'Plocha je svislá a míří kolmo k fasádě, například stěna protějšího objektu.'],
+    max: ['nejnepříznivější natočení', 'V každém bodě se hledá natočení plochy, na které dopadá největší tok. Dává největší izoplochy.'],
+    perp: ['svislá, kolmá k fasádě', 'Plocha je svislá a kolmá k fasádě, například boční stěna sousedního objektu. Bere se horší z obou stran.'],
+    hor: ['vodorovná', 'Plocha je vodorovná, například střecha nižšího objektu. Bere se horší z obou stran.']
+  };
+
+  function fmt(v, d) { return Number(v).toLocaleString('cs-CZ', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function fmtIn(v) { return String(Math.round(v * 1000) / 1000).replace('.', ','); }
+  function fmtLv(v) { return fmtIn(v); }
+  function parseNum(s) { s = String(s).trim().replace(/\s/g, '').replace(',', '.'); if (s === '' || !/^-?\d*\.?\d+$/.test(s)) return NaN; return Number(s); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function defaults() {
+    var row = function () { return [{ x: 1.5, s: 0.9, w: 1.5, h: 1.5 }, { x: 5.25, s: 0.9, w: 1.5, h: 1.5 }, { x: 9, s: 0.9, w: 1.5, h: 1.5 }]; };
+    return {
+      src: { mode: 'curve', tau: 60, T: 900, eps: 1 }, L: 12, base: 0, nf: 2,
+      floors: [{ h: 3, wins: row() }, { h: 3, wins: row() }, { h: 3, wins: row() }],
+      levels: [18.5, 10], orient: 'par', res: 88, probe: { on: true, x: 6, y: 4, z: 1.5 }
+    };
+  }
+  var st = defaults();
+  try {
+    var saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (saved && saved.src && Array.isArray(saved.floors) && saved.floors.length === 3 && Array.isArray(saved.levels)) st = saved;
+  } catch (e) { /* bez uloženého zadání */ }
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(st)); } catch (e) { /* nevadí */ } }
+
+  var ui = { view: '3d', plan: { mode: 'env', cut: null }, side: { mode: 'env', cut: null }, alpha: 0.55, hidden: {} };
+  var result = null;       // poslední výsledek výpočtu
+  var downloads = null;
+
+  // ---------- odvozené veličiny ----------
+  function derive() {
+    var T = st.src.mode === 'curve' ? Core.normTemp(st.src.tau) : st.src.T;
+    var I = Core.emissive(T, st.src.eps);
+    var wins = [], floorsZ = [], z = st.base, warn = [];
+    for (var f = 0; f < st.nf; f++) {
+      var fl = st.floors[f]; floorsZ.push(z);
+      fl.wins.forEach(function (w, i) {
+        wins.push({ x0: w.x, x1: w.x + w.w, z0: z + w.s, z1: z + w.s + w.h, f: f });
+        if (w.s + w.h > fl.h + 1e-9) warn.push((f + 1) + '. podlaží, okno ' + (i + 1) + ': parapet + výška přesahuje konstrukční výšku podlaží.');
+        if (w.x < 0 || w.x + w.w > st.L + 1e-9) warn.push((f + 1) + '. podlaží, okno ' + (i + 1) + ': okno leží mimo délku fasády.');
+        fl.wins.forEach(function (o, j) {
+          if (j > i && w.x < o.x + o.w - 1e-9 && o.x < w.x + w.w - 1e-9 && w.s < o.s + o.h - 1e-9 && o.s < w.s + w.h - 1e-9)
+            warn.push((f + 1) + '. podlaží: okna ' + (i + 1) + ' a ' + (j + 1) + ' se překrývají, překryv se započítá dvakrát.');
+        });
+      });
+      z += fl.h;
+    }
+    return { T: T, I: I, wins: wins, floorsZ: floorsZ, H: z, L: st.L, warn: warn, eps: st.src.eps, mode: st.src.mode, tau: st.src.tau, orient: st.orient, base: st.base };
+  }
+  function levelList() {
+    var seen = {}, out = [];
+    st.levels.forEach(function (v) { if (v > 0 && !seen[v]) { seen[v] = 1; out.push(v); } });
+    return out.sort(function (a, b) { return b - a; });
+  }
+  function levelColor(v) {
+    var l = levelList(), i = l.indexOf(v), pick = PAL_PICK[Math.min(l.length, 5)] || PAL_PICK[5];
+    return i < 0 ? '#888888' : PAL[pick[Math.min(i, pick.length - 1)]];
+  }
+
+  // ---------- zadání ----------
+  function renderFloors() {
+    var h = '';
+    for (var f = 0; f < st.nf; f++) {
+      var fl = st.floors[f];
+      h += '<div class="floor"><div class="floor-head"><strong>' + (f + 1) + '. podlaží</strong>' +
+        '<span class="inp"><label for="fh' + f + '" style="color:var(--muted);font-size:12.5px">konstrukční výška</label><input type="text" inputmode="decimal" id="fh' + f + '" data-k="floors.' + f + '.h" data-min="1.5" data-max="30" value="' + fmtIn(fl.h) + '"><i>m</i></span></div>';
+      h += '<table class="wins"><thead><tr><th>č.</th><th>x</th><th>parapet</th><th>šířka</th><th>výška</th><th></th></tr></thead><tbody>';
+      fl.wins.forEach(function (w, i) {
+        var p = 'floors.' + f + '.wins.' + i + '.', id = 'w' + f + '_' + i;
+        h += '<tr><td>' + (i + 1) + '</td>' +
+          '<td><input type="text" inputmode="decimal" id="' + id + 'x" aria-label="Okno ' + (i + 1) + ', x" data-k="' + p + 'x" data-min="-500" data-max="500" value="' + fmtIn(w.x) + '"></td>' +
+          '<td><input type="text" inputmode="decimal" id="' + id + 's" aria-label="Okno ' + (i + 1) + ', parapet" data-k="' + p + 's" data-min="0" data-max="30" value="' + fmtIn(w.s) + '"></td>' +
+          '<td><input type="text" inputmode="decimal" id="' + id + 'w" aria-label="Okno ' + (i + 1) + ', šířka" data-k="' + p + 'w" data-min="0.05" data-max="500" value="' + fmtIn(w.w) + '"></td>' +
+          '<td><input type="text" inputmode="decimal" id="' + id + 'h" aria-label="Okno ' + (i + 1) + ', výška" data-k="' + p + 'h" data-min="0.05" data-max="30" value="' + fmtIn(w.h) + '"></td>' +
+          '<td class="act"><button type="button" class="ib" title="Zdvojit okno" aria-label="Zdvojit okno ' + (i + 1) + '" data-act="dup-win" data-f="' + f + '" data-i="' + i + '">⧉</button>' +
+          '<button type="button" class="ib" title="Odebrat okno" aria-label="Odebrat okno ' + (i + 1) + '" data-act="del-win" data-f="' + f + '" data-i="' + i + '">✕</button></td></tr>';
+      });
+      if (!fl.wins.length) h += '<tr><td colspan="6" style="color:var(--muted);font:12.5px var(--font-body)">Podlaží nemá žádné okno.</td></tr>';
+      h += '</tbody></table><div class="btns"><button type="button" class="btn" data-act="add-win" data-f="' + f + '">Přidat okno</button>';
+      if (f > 0) h += '<button type="button" class="btn" data-act="copy-floor" data-f="' + f + '">Převzít okna z ' + f + '. podlaží</button>';
+      h += '</div><details class="gen"><summary>Pravidelná řada oken</summary><div class="gen-grid">' +
+        '<label for="g' + f + 'n">počet <input type="text" inputmode="numeric" id="g' + f + 'n" value="4"></label>' +
+        '<label for="g' + f + 'x">první x <input type="text" inputmode="decimal" id="g' + f + 'x" value="1"></label>' +
+        '<label for="g' + f + 'w">šířka <input type="text" inputmode="decimal" id="g' + f + 'w" value="1,5"></label>' +
+        '<label for="g' + f + 'p">osová rozteč <input type="text" inputmode="decimal" id="g' + f + 'p" value="2,8"></label>' +
+        '<label for="g' + f + 'h">výška <input type="text" inputmode="decimal" id="g' + f + 'h" value="1,5"></label>' +
+        '<label for="g' + f + 's">parapet <input type="text" inputmode="decimal" id="g' + f + 's" value="0,9"></label>' +
+        '</div><button type="button" class="btn" data-act="gen-row" data-f="' + f + '">Nahradit okna podlaží řadou</button></details></div>';
+    }
+    $('#floors').innerHTML = h;
+  }
+  function renderLevels() {
+    var d = derive(), h = '';
+    st.levels.forEach(function (v, i) {
+      var none = v >= d.I;
+      h += '<div class="level"><span class="sw" style="background:' + levelColor(v) + '"></span>' +
+        '<span class="inp"><input type="text" inputmode="decimal" id="lv' + i + '" aria-label="Hladina ' + (i + 1) + '" data-k="levels.' + i + '" data-min="0.1" data-max="2000" value="' + fmtIn(v) + '"><i>kW/m²</i></span>' +
+        '<span class="note">' + (none ? 'nad hodnotou zdroje, izoplocha neexistuje' : '') + '</span>' +
+        (st.levels.length > 1 ? '<button type="button" class="ib" title="Odebrat hladinu" aria-label="Odebrat hladinu ' + fmtLv(v) + '" data-act="del-level" data-i="' + i + '">✕</button>' : '') + '</div>';
+    });
+    $('#levels').innerHTML = h;
+    $('#btn-add-level').hidden = st.levels.length >= 5;
+  }
+  function setSeg(id, v) { Array.prototype.forEach.call($(id).querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === String(v))); }); }
+  function renderStatic() {
+    $('#in-tau').value = fmtIn(st.src.tau); $('#in-T').value = fmtIn(st.src.T); $('#in-eps').value = fmtIn(st.src.eps);
+    $('#in-L').value = fmtIn(st.L); $('#in-base').value = fmtIn(st.base);
+    $('#in-px').value = fmtIn(st.probe.x); $('#in-py').value = fmtIn(st.probe.y); $('#in-pz').value = fmtIn(st.probe.z);
+    $('#chk-probe').checked = !!st.probe.on;
+    $('#sel-orient').value = st.orient;
+    renderSegs(); renderFloors(); renderLevels(); renderReadouts();
+  }
+  function renderSegs() {
+    setSeg('#seg-src', st.src.mode); setSeg('#seg-nf', st.nf); setSeg('#seg-res', st.res); setSeg('#seg-view', ui.view);
+    $('#row-tau').hidden = st.src.mode !== 'curve'; $('#row-T').hidden = st.src.mode !== 'temp';
+    $('#orient-hint').textContent = ORIENT[st.orient][1];
+  }
+  function renderReadouts() {
+    var d = derive();
+    $('#ro-src').innerHTML = (st.src.mode === 'curve'
+      ? 'T = 20 + 345·log(8·τ<sub>e</sub> + 1) = ' + fmt(d.T, 1) + ' °C<br>' : '') +
+      'I = ε·σ·T⁴ = ' + fmt(d.I, 1) + ' kW/m²<small>hustota tepelného toku vyzařovaná z roviny oken</small>';
+    $('#warn').innerHTML = d.warn.slice(0, 6).map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('');
+  }
+  function setPath(path, v) {
+    var k = path.split('.'), o = st;
+    for (var i = 0; i < k.length - 1; i++) o = o[k[i]];
+    o[k[k.length - 1]] = v;
+  }
+
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.k) {
+      var v = parseNum(t.value), ok = isFinite(v) && v >= Number(t.dataset.min) && v <= Number(t.dataset.max);
+      t.setAttribute('aria-invalid', String(!ok));
+      if (!ok) return;
+      setPath(t.dataset.k, v);
+      if (t.dataset.k.indexOf('probe.') === 0) { save(); renderProbe(); redraw(); return; }
+      if (t.dataset.k.indexOf('levels.') === 0) refreshLevelSwatches();
+      changed();
+    } else if (t.id === 'rng-alpha') { ui.alpha = Number(t.value); GLV.draw(); }
+    else if (t.id === 'rng-cut') { ui[ui.view].cut = Number(t.value); draw2D(true); }
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'sel-orient') { st.orient = t.value; renderSegs(); changed(); }
+    else if (t.id === 'chk-probe') { st.probe.on = t.checked; save(); renderProbe(); redraw(); }
+    else if (t.id === 'rng-cut') { draw2D(false); }
+    else if (t.dataset && t.dataset.lv) { ui.hidden[t.dataset.lv] = !t.checked; GLV.draw(); }
+    else if (t.dataset && t.dataset.k && t.dataset.k.indexOf('levels.') === 0) renderLevels();
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var a = b.dataset.act, f = Number(b.dataset.f), i = Number(b.dataset.i), fl = st.floors[f];
+    if (a === 'src-mode') {
+      if (b.dataset.v === 'temp' && st.src.mode === 'curve') { st.src.T = Math.round(Core.normTemp(st.src.tau)); $('#in-T').value = fmtIn(st.src.T); }
+      st.src.mode = b.dataset.v; renderSegs(); changed();
+    }
+    else if (a === 'nf') { st.nf = Number(b.dataset.v); renderSegs(); renderFloors(); changed(); }
+    else if (a === 'res') { st.res = Number(b.dataset.v); renderSegs(); changed(); }
+    else if (a === 'add-win') {
+      var last = fl.wins[fl.wins.length - 1];
+      fl.wins.push(last ? { x: Math.round((last.x + last.w + 1) * 100) / 100, s: last.s, w: last.w, h: last.h } : { x: 1, s: 0.9, w: 1.5, h: 1.5 });
+      renderFloors(); changed();
+    }
+    else if (a === 'dup-win') { var w = fl.wins[i]; fl.wins.splice(i + 1, 0, { x: Math.round((w.x + w.w + 1) * 100) / 100, s: w.s, w: w.w, h: w.h }); renderFloors(); changed(); }
+    else if (a === 'del-win') { fl.wins.splice(i, 1); renderFloors(); changed(); }
+    else if (a === 'copy-floor') { fl.wins = st.floors[f - 1].wins.map(function (w) { return { x: w.x, s: w.s, w: w.w, h: w.h }; }); renderFloors(); changed(); }
+    else if (a === 'gen-row') {
+      var g = function (k) { return parseNum($('#g' + f + k).value); };
+      var n = Math.round(g('n')), x1 = g('x'), ww = g('w'), p = g('p'), hh = g('h'), s = g('s');
+      if (!(n >= 1 && n <= 60) || !isFinite(x1) || !(ww > 0) || !(p > 0) || !(hh > 0) || !(s >= 0)) return;
+      fl.wins = [];
+      for (var q = 0; q < n; q++) fl.wins.push({ x: Math.round((x1 + q * p) * 1000) / 1000, s: s, w: ww, h: hh });
+      renderFloors(); changed();
+    }
+    else if (a === 'add-level') { if (st.levels.length < 5) { var m = Math.min.apply(null, st.levels); st.levels.push(Math.max(0.5, Math.round(m / 2 * 10) / 10)); renderLevels(); changed(); } }
+    else if (a === 'del-level') { st.levels.splice(i, 1); renderLevels(); changed(); }
+    else if (a === 'reset') { st = defaults(); ui.plan.cut = ui.side.cut = null; renderStatic(); changed(); }
+    else if (a === 'view') { ui.view = b.dataset.v; renderSegs(); showView(); }
+    else if (a === 'cam') { GLV.preset(b.dataset.v); }
+    else if (a === 'mode2d') { ui[ui.view].mode = b.dataset.v; showView(); }
+    else if (a === 'export') { exportSVG(); }
+  });
+  function refreshLevelSwatches() {
+    Array.prototype.forEach.call($('#levels').querySelectorAll('.level'), function (el, i) { el.querySelector('.sw').style.background = levelColor(st.levels[i]); });
+  }
+
+  // ---------- výpočet ----------
+  var worker = null, busy = false, jobId = 0, timer = 0, t0 = 0;
+  function makeWorker() {
+    try {
+      var src = 'var CORE=' + CORE.toString() + ';var Core=CORE();onmessage=function(e){var job=e.data,it=Core.solve(job);for(;;){var s=it.next();' +
+        'if(s.done){var r=s.value,tr=[];r.id=job.id;if(!r.empty){tr.push(r.plan.buffer,r.side.buffer);r.levels.forEach(function(m){tr.push(m.pos.buffer,m.nrm.buffer,m.idx.buffer);});}postMessage({type:"done",res:r},tr);break;}' +
+        'postMessage({type:"prog",id:job.id,p:s.value});}};';
+      var w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      w.onmessage = function (e) {
+        var m = e.data;
+        if (m.type === 'prog') { if (m.id === jobId) progress(m.p); }
+        else if (m.res.id === jobId) { busy = false; onResult(m.res); }
+      };
+      w.onerror = function () { worker = null; busy = false; runInline(currentJob); };
+      return w;
+    } catch (e) { return null; }
+  }
+  var currentJob = null, inlineTok = 0;
+  function runInline(job) {
+    var it = Core.solve(job), tok = ++inlineTok;
+    (function step() {
+      if (tok !== inlineTok) return;
+      var t = Date.now(), s;
+      do { s = it.next(); } while (!s.done && Date.now() - t < 40);
+      if (s.done) { s.value.id = job.id; onResult(s.value); } else { progress(s.value); setTimeout(step, 0); }
+    })();
+  }
+  function progress(p) {
+    $('#progress').hidden = false; $('#progress i').style.width = Math.round(p * 100) + '%';
+    $('#status').hidden = false; $('#status').textContent = 'Počítám ' + Math.round(p * 100) + ' %';
+  }
+  function changed() {
+    save(); renderReadouts(); renderSummary(null); renderProbe();
+    clearTimeout(timer); timer = setTimeout(run, 280);
+  }
+  function run() {
+    var d = derive();
+    jobId++; t0 = Date.now();
+    currentJob = { id: jobId, wins: d.wins.map(function (w) { return { x0: w.x0, x1: w.x1, z0: w.z0, z1: w.z1 }; }), I: d.I, levels: levelList(), mode: st.orient, nMax: st.res, derived: d };
+    progress(0);
+    inlineTok++;
+    if (busy && worker) { worker.terminate(); worker = null; }
+    if (!worker) worker = makeWorker();
+    if (worker) { busy = true; var j = Object.assign({}, currentJob); delete j.derived; worker.postMessage(j); }
+    else runInline(currentJob);
+  }
+  function onResult(r) {
+    r.derived = currentJob.derived; r.ms = Date.now() - t0; r.src = Core.srcBox(currentJob.wins.length ? currentJob.wins : [{ x0: 0, x1: 0, z0: 0, z1: 0 }]);
+    result = r; cutCache = {};
+    $('#progress').hidden = true; $('#status').hidden = true;
+    var d = r.derived;
+    if (r.empty) {
+      $('#empty').hidden = false;
+      $('#empty').textContent = !d.wins.length ? 'Zadejte alespoň jedno okno.' :
+        'Žádná zadaná hladina není nižší než hustota toku zdroje I = ' + fmt(d.I, 1) + ' kW/m². Izoplochy proto neexistují. Snižte hladiny nebo zvyšte teplotu.';
+      $('#grid-info').textContent = '';
+    } else {
+      $('#empty').hidden = true;
+      var g = r.grid;
+      $('#grid-info').textContent = 'Síť ' + g.nx + ' × ' + g.ny + ' × ' + g.nz + ' uzlů, krok asi ' + fmt(Math.max(g.dx, g.dy, g.dz) * 100, 0) + ' cm, výpočet ' + fmt(r.ms / 1000, 1) + ' s.';
+      // výchozí polohy řezů: místo největšího dosahu nejnižší hladiny
+      var far = r.levels[0].stats.dAt, zTop = Math.max(d.H, r.box.z1), xl = Math.min(0, r.box.x0), xr = Math.max(d.L, r.box.x1);
+      if (ui.plan.cut === null || ui.plan.cut > zTop) ui.plan.cut = Math.round(far[2] * 20) / 20;
+      if (ui.side.cut === null || ui.side.cut < xl || ui.side.cut > xr) ui.side.cut = Math.round(far[0] * 20) / 20;
+    }
+    renderLevels(); renderSummary(r); renderTable(r); renderProbe(); renderLegend3d();
+    GLV.setScene(r); showView();
+  }
+
+  // ---------- souhrn a tabulka ----------
+  function renderSummary(r) {
+    var d = derive(), h = '<div><span class="k">teplota plynů</span><b>' + fmt(d.T, 0) + ' °C</b></div><div><span class="k">tok z oken I</span><b>' + fmt(d.I, 1) + ' kW/m²</b></div>';
+    if (r && !r.empty) r.levels.slice().reverse().forEach(function (m) {
+      h += '<div><span class="sw" style="background:' + levelColor(m.level) + '"></span><span class="k">odstup pro ' + fmtLv(m.level) + ' kW/m²</span><b>' + (m.idx.length ? fmt(m.stats.dMax, 2) + ' m' : '–') + '</b></div>';
+    });
+    else if (!r) h += '<div><span class="k">odstupy</span><b>…</b></div>';
+    $('#sum').innerHTML = h;
+  }
+  function renderTable(r) {
+    var h = '<thead><tr><th>Hladina</th><th>Odstup d</th><th>v místě x ; z</th><th>Přesah do stran</th><th>Přesah nad okna</th><th>Horní okraj</th></tr></thead><tbody>';
+    if (!r.empty) r.levels.slice().reverse().forEach(function (m) {
+      var s = m.stats;
+      if (!m.idx.length) { h += '<tr><td><span class="sw" style="background:' + levelColor(m.level) + '"></span>' + fmtLv(m.level) + ' kW/m²</td><td colspan="5">izoplocha je menší než krok sítě</td></tr>'; return; }
+      var sideOv = Math.max(r.src.x0 - s.xMin, s.xMax - r.src.x1, 0), topOv = Math.max(s.zMax - r.src.z1, 0);
+      h += '<tr><td><span class="sw" style="background:' + levelColor(m.level) + '"></span>' + fmtLv(m.level) + ' kW/m²</td><td class="d">' + fmt(s.dMax, 2) + ' m</td><td>' + fmt(s.dAt[0], 2) + ' ; ' + fmt(s.dAt[2], 2) + ' m</td><td>' + fmt(sideOv, 2) + ' m</td><td>' + fmt(topOv, 2) + ' m</td><td>' + fmt(s.zMax, 2) + ' m</td></tr>';
+    });
+    levelList().forEach(function (v) { if (v >= r.derived.I) h += '<tr><td><span class="sw" style="background:#888"></span>' + fmtLv(v) + ' kW/m²</td><td colspan="5">hladina je vyšší než tok zdroje</td></tr>'; });
+    $('#res').innerHTML = h + '</tbody>';
+  }
+  function probeQ() { var d = derive(); return d.wins.length ? d.I * Core.factor(st.probe.x, st.probe.y, st.probe.z, d.wins, st.orient) : 0; }
+  function renderProbe() {
+    var el = $('#probe-q');
+    if (!st.probe.on) { el.innerHTML = '<span class="pill ok">vypnuto</span>'; return; }
+    var q = probeQ(), over = levelList().filter(function (v) { return q >= v; });
+    el.innerHTML = 'q = ' + fmt(q, 2) + ' kW/m² ' + (over.length ? '<span class="pill hot">překračuje ' + fmtLv(over[0]) + ' kW/m²</span>' : '<span class="pill ok">pod všemi hladinami</span>');
+  }
+  function renderLegend3d() {
+    var h = '<span class="cap">Izoplochy q [kW/m²]</span>';
+    if (result && !result.empty) result.levels.slice().reverse().forEach(function (m) {
+      h += '<label><input type="checkbox" data-lv="' + m.level + '"' + (ui.hidden[m.level] ? '' : ' checked') + '><span class="sw" style="background:' + levelColor(m.level) + '"></span>' + fmtLv(m.level) + '</label>';
+    });
+    h += '<label style="cursor:default"><span class="sw" style="background:var(--fire);margin-left:20px"></span>okna</label>';
+    $('#legend3d').innerHTML = h;
+  }
+
+  // ---------- pohledy ----------
+  function showView() {
+    var is3 = ui.view === '3d';
+    $('#pane-3d').hidden = !is3; $('#pane-2d').hidden = is3;
+    $('#tools-3d').hidden = !is3; $('#tools-2d').hidden = is3;
+    if (is3) { GLV.resize(); return; }
+    var v = ui[ui.view]; setSeg('#seg-2dmode', v.mode);
+    var rng = $('#rng-cut');
+    if (result && !result.empty) {
+      var d = result.derived;
+      if (ui.view === 'plan') { rng.min = 0; rng.max = Math.ceil(Math.max(d.H, result.box.z1) * 20) / 20; $('#cut-name').textContent = 'Výška řezu z'; }
+      else { rng.min = Math.floor(Math.min(0, result.box.x0) * 20) / 20; rng.max = Math.ceil(Math.max(d.L, result.box.x1) * 20) / 20; $('#cut-name').textContent = 'Poloha řezu x'; }
+      rng.value = v.cut;
+    }
+    $('#lbl-cut').style.visibility = v.mode === 'cut' ? 'visible' : 'hidden';
+    draw2D(false);
+  }
+  function redraw() { if (ui.view === '3d') GLV.draw(); else draw2D(false); }
+
+  // ---------- 2D výkres ----------
+  var cutCache = {}, lastMap = null;
+  function section(kind, cut, coarse) {
+    var key = kind + '|' + cut + '|' + (coarse ? 1 : 0);
+    if (cutCache[key]) return cutCache[key];
+    var r = result, b = r.box, d = r.derived, mode = r.mode, I = r.I;
+    var su = kind === 'plan' ? b.x1 - b.x0 : b.y1, sv = kind === 'plan' ? b.y1 : b.z1 - b.z0;
+    var h = Math.max(su, sv) / (coarse ? 90 : 220);
+    var nu = Math.max(8, Math.round(su / h) + 1), nv = Math.max(8, Math.round(sv / h) + 1), du = su / (nu - 1), dv = sv / (nv - 1);
+    var u0 = kind === 'plan' ? b.x0 : 0, v0 = kind === 'plan' ? 0 : b.z0, data = new Float32Array(nu * nv), i, j;
+    for (j = 0; j < nv; j++) for (i = 0; i < nu; i++)
+      data[i + j * nu] = I * (kind === 'plan' ? Core.factor(u0 + i * du, v0 + j * dv, cut, d.wins, mode) : Core.factor(cut, u0 + i * du, v0 + j * dv, d.wins, mode));
+    var out = { data: data, nu: nu, nv: nv, u0: u0, du: du, v0: v0, dv: dv };
+    if (!coarse) cutCache[key] = out;
+    return out;
+  }
+  function field2D(kind, coarse) {
+    var r = result, g = r.grid, v = ui[kind];
+    if (v.mode === 'cut') return section(kind, v.cut, coarse);
+    return kind === 'plan' ? { data: r.plan, nu: g.nx, nv: g.ny, u0: g.x0, du: g.dx, v0: 0, dv: g.dy }
+                           : { data: r.side, nu: g.ny, nv: g.nz, u0: 0, du: g.dy, v0: g.z0, dv: g.dz };
+  }
+  function niceStep(perM, minLen) { var c = [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100]; for (var i = 0; i < c.length; i++) if (c[i] * perM >= minLen) return c[i]; return 200; }
+
+  // sestaví SVG; exportN = jmenovatel měřítka (pak jsou jednotky mm), jinak px podle W×H
+  function buildSVG(kind, W, H, exportN, coarse) {
+    var r = result, d = r.derived, b = r.box, v = ui[kind], exp = !!exportN, u = exp ? 0.3 : 1;
+    var band = 0.9, U0, U1, V0, V1;
+    if (kind === 'plan') { U0 = Math.min(0, b.x0) - 0.6; U1 = Math.max(d.L, b.x1) + 0.6; V0 = -band; V1 = b.y1 + 1.0; }
+    else { U0 = -band; U1 = b.y1 + 1.0; V0 = -0.6; V1 = Math.max(d.H, b.z1) + 0.6; }
+    var mL = 46 * u, mR = 18 * u, mT = 64 * u, mB = 70 * u, s;
+    if (exp) s = 1000 / exportN; else s = Math.max(1, Math.min((W - mL - mR) / (U1 - U0), (H - mT - mB) / (V1 - V0)));
+    var pw = (U1 - U0) * s, ph = (V1 - V0) * s;
+    if (exp) { W = pw + mL + mR; H = ph + mT + mB; }
+    var ox = exp ? mL : Math.max(mL, (W - pw) / 2), oy = mT;
+    var X = function (a) { return ox + (a - U0) * s; };
+    var Y = kind === 'plan' ? function (c) { return oy + (c - V0) * s; } : function (c) { return oy + (V1 - c) * s; };
+    var n2 = function (a) { return (Math.round(a * 100) / 100).toString(); };
+    var o = [], fs = 11 * u, uid = 'h' + (exp ? 'x' : 's') + kind;
+    var txt = function (x, y, t, cls, anchor, size, extra) { return '<text x="' + n2(x) + '" y="' + n2(y) + '" class="' + cls + '" font-size="' + n2(size || fs) + '"' + (anchor ? ' text-anchor="' + anchor + '"' : '') + (extra || '') + '>' + esc(t) + '</text>'; };
+
+    o.push('<defs><pattern id="' + uid + '" width="' + n2(6 * u) + '" height="' + n2(6 * u) + '" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="' + n2(6 * u) + '" class="v-hatch" stroke-width="' + n2(0.8 * u) + '"/></pattern>' +
+      '<clipPath id="c' + uid + '"><rect x="' + n2(ox) + '" y="' + n2(oy) + '" width="' + n2(pw) + '" height="' + n2(ph) + '"/></clipPath></defs>');
+    o.push('<rect class="v-bg" x="0" y="0" width="' + n2(W) + '" height="' + n2(H) + '"/>');
+    o.push('<rect class="v-plot" x="' + n2(ox) + '" y="' + n2(oy) + '" width="' + n2(pw) + '" height="' + n2(ph) + '" stroke-width="' + n2(u) + '"/>');
+
+    // záhlaví
+    var title = kind === 'plan' ? 'PŮDORYS' : 'BOKORYS (pohled zleva)';
+    var sub = v.mode === 'env' ? 'průmět izoploch v největším rozsahu' :
+      (kind === 'plan' ? 'vodorovný řez ve výšce z = ' + fmt(v.cut, 2) + ' m nad terénem' : 'svislý řez kolmo k fasádě v x = ' + fmt(v.cut, 2) + ' m');
+    o.push(txt(ox, 16 * u, title, 'v-ink', null, 14 * u, ' font-weight="600"'));
+    o.push(txt(ox + (kind === 'plan' ? 78 : 186) * u, 16 * u, sub, 'v-ink', null, 12 * u));
+    var tl = (d.mode === 'curve' ? 'τe = ' + fmtIn(d.tau) + ' min, ' : '') + 'T = ' + fmt(d.T, 0) + ' °C, ε = ' + fmt(d.eps, 2) + ', I = ' + fmt(d.I, 1) + ' kW/m², ozařovaná plocha ' + ORIENT[r.mode][0];
+    o.push(txt(ox, 31 * u, tl, 'v-mut', null, 10.5 * u));
+
+    // mřížka a osy
+    var gs = niceStep(s / u, 16), ls = niceStep(s / u, 38), a, k;
+    var g = ['<g clip-path="url(#c' + uid + ')">'];
+    for (k = Math.ceil(U0 / gs); k * gs <= U1; k++) { a = k * gs; g.push('<line x1="' + n2(X(a)) + '" y1="' + n2(oy) + '" x2="' + n2(X(a)) + '" y2="' + n2(oy + ph) + '" class="' + (Math.abs(a / (gs * 5) - Math.round(a / (gs * 5))) < 1e-6 ? 'v-g2' : 'v-g1') + '" stroke-width="' + n2(0.7 * u) + '"/>'); }
+    for (k = Math.ceil(V0 / gs); k * gs <= V1; k++) { a = k * gs; g.push('<line x1="' + n2(ox) + '" y1="' + n2(Y(a)) + '" x2="' + n2(ox + pw) + '" y2="' + n2(Y(a)) + '" class="' + (Math.abs(a / (gs * 5) - Math.round(a / (gs * 5))) < 1e-6 ? 'v-g2' : 'v-g1') + '" stroke-width="' + n2(0.7 * u) + '"/>'); }
+    for (k = Math.ceil(U0 / ls); k * ls <= U1; k++) { a = k * ls; if (X(a) > ox + pw - 36 * u) continue; o.push('<line x1="' + n2(X(a)) + '" y1="' + n2(oy - 4 * u) + '" x2="' + n2(X(a)) + '" y2="' + n2(oy) + '" class="v-ax" stroke-width="' + n2(u) + '"/>' + txt(X(a), oy - 7 * u, fmtIn(a), 'v-mut', 'middle', 10 * u)); }
+    for (k = Math.ceil(V0 / ls); k * ls <= V1; k++) { a = k * ls; if (kind === 'plan' ? Y(a) > oy + ph - 14 * u : Y(a) < oy + 14 * u) continue; o.push('<line x1="' + n2(ox - 4 * u) + '" y1="' + n2(Y(a)) + '" x2="' + n2(ox) + '" y2="' + n2(Y(a)) + '" class="v-ax" stroke-width="' + n2(u) + '"/>' + txt(ox - 7 * u, Y(a) + 3.5 * u, fmtIn(a), 'v-mut', 'end', 10 * u)); }
+    o.push(txt(ox + pw, oy - 7 * u, kind === 'plan' ? 'x [m]' : 'y [m]', 'v-ink', 'end', 10 * u, ' font-weight="600"'));
+    o.push(txt(ox - 7 * u, kind === 'plan' ? oy + ph - 2 * u : oy + 8 * u, kind === 'plan' ? 'y [m]' : 'z [m]', 'v-ink', 'end', 10 * u, ' font-weight="600"'));
+
+    // objekt
+    if (kind === 'plan') {
+      g.push('<rect x="' + n2(X(0)) + '" y="' + n2(Y(-band)) + '" width="' + n2(d.L * s) + '" height="' + n2(band * s) + '" fill="url(#' + uid + ')" stroke="none"/>');
+      g.push('<path d="M' + n2(X(0)) + ' ' + n2(Y(-band)) + 'V' + n2(Y(0)) + 'H' + n2(X(d.L)) + 'V' + n2(Y(-band)) + '" fill="none" class="v-wall" stroke-width="' + n2(1.6 * u) + '"/>');
+      d.wins.forEach(function (w) { g.push('<line x1="' + n2(X(w.x0)) + '" y1="' + n2(Y(0)) + '" x2="' + n2(X(w.x1)) + '" y2="' + n2(Y(0)) + '" class="v-win" stroke-width="' + n2(4.5 * u) + '"' + (v.mode === 'cut' && (v.cut < w.z0 || v.cut > w.z1) ? ' stroke-opacity="0.35"' : '') + '/>'); });
+    } else {
+      g.push('<rect x="' + n2(ox) + '" y="' + n2(Y(0)) + '" width="' + n2(pw) + '" height="' + n2(0.6 * s) + '" fill="url(#' + uid + ')" stroke="none" opacity="0.6"/>');
+      g.push('<rect x="' + n2(X(-band)) + '" y="' + n2(Y(d.H)) + '" width="' + n2(band * s) + '" height="' + n2(d.H * s) + '" fill="url(#' + uid + ')" stroke="none"/>');
+      g.push('<path d="M' + n2(X(-band)) + ' ' + n2(Y(d.H)) + 'H' + n2(X(0)) + 'V' + n2(Y(0)) + '" fill="none" class="v-wall" stroke-width="' + n2(1.6 * u) + '"/>');
+      g.push('<line x1="' + n2(ox) + '" y1="' + n2(Y(0)) + '" x2="' + n2(ox + pw) + '" y2="' + n2(Y(0)) + '" class="v-wall" stroke-width="' + n2(1.6 * u) + '"/>');
+      d.floorsZ.forEach(function (z, i) {
+        g.push('<line x1="' + n2(X(-band)) + '" y1="' + n2(Y(z)) + '" x2="' + n2(X(0)) + '" y2="' + n2(Y(z)) + '" class="v-wall" stroke-width="' + n2(u) + '"/>');
+        var zt = i + 1 < d.floorsZ.length ? d.floorsZ[i + 1] : d.H;
+        g.push(txt(X(-band / 2), Y((z + zt) / 2) + 4 * u, (i + 1) + '.', 'v-ink', 'middle', 11 * u, ' font-weight="600" paint-order="stroke" stroke-width="' + n2(3 * u) + '" stroke="' + (exp ? '#fff' : 'var(--panel)') + '"'));
+      });
+      d.wins.forEach(function (w) { g.push('<line x1="' + n2(X(0)) + '" y1="' + n2(Y(w.z0)) + '" x2="' + n2(X(0)) + '" y2="' + n2(Y(w.z1)) + '" class="v-win" stroke-width="' + n2(4.5 * u) + '"' + (v.mode === 'cut' && (v.cut < w.x0 || v.cut > w.x1) ? ' stroke-opacity="0.35"' : '') + '/>'); });
+    }
+
+    // izočáry
+    var F = field2D(kind, coarse), lv = r.levels, dims = [];
+    lv.forEach(function (m) {
+      if (!m.idx.length) return;
+      var loops = Core.contours(F.data, F.nu, F.nv, F.u0, F.du, F.v0, F.dv, m.level);
+      if (!loops.length) return;
+      var col = levelColor(m.level), p = '', far = null;
+      loops.forEach(function (lp) {
+        lp.forEach(function (q, i) {
+          var yy = kind === 'plan' ? q[1] : q[0];
+          if (!far || yy > far.d) far = { d: yy, u: q[0], v: q[1] };
+          p += (i ? 'L' : 'M') + n2(X(q[0])) + ' ' + n2(Y(q[1]));
+        });
+        p += 'Z';
+      });
+      g.push('<path d="' + p + '" fill="' + col + '" fill-opacity="0.13" fill-rule="evenodd" stroke="' + col + '" stroke-width="' + n2(1.8 * u) + '" stroke-linejoin="round"/>');
+      dims.push({ level: m.level, col: col, far: far });
+    });
+    // kóty odstupů
+    dims.forEach(function (dm, i) {
+      var f = dm.far, t = 'd = ' + fmt(f.d, 2) + ' m', halo = ' paint-order="stroke" stroke-width="' + n2(3.2 * u) + '" stroke="' + (exp ? '#fff' : 'var(--panel)') + '" stroke-linejoin="round" font-weight="600"';
+      if (kind === 'plan') {
+        var x = X(f.u), y1 = Y(0), y2 = Y(f.d), right = i % 2 === 0;
+        g.push('<path d="M' + n2(x) + ' ' + n2(y1) + 'V' + n2(y2) + 'M' + n2(x - 4 * u) + ' ' + n2(y2) + 'h' + n2(8 * u) + '" fill="none" stroke="' + dm.col + '" stroke-width="' + n2(u) + '" stroke-dasharray="' + n2(4 * u) + ' ' + n2(3 * u) + '"/>');
+        g.push(txt(x + (right ? 7 : -7) * u, y2 - 5 * u, t, 'v-ink', right ? 'start' : 'end', 11 * u, halo));
+      } else {
+        var xx = X(f.d), y = Y(f.v), up = i % 2 === 0;
+        g.push('<path d="M' + n2(X(0)) + ' ' + n2(y) + 'H' + n2(xx) + 'M' + n2(xx) + ' ' + n2(y - 4 * u) + 'v' + n2(8 * u) + '" fill="none" stroke="' + dm.col + '" stroke-width="' + n2(u) + '" stroke-dasharray="' + n2(4 * u) + ' ' + n2(3 * u) + '"/>');
+        g.push(txt(xx - 6 * u, y + (up ? -6 : 14) * u, t, 'v-ink', 'end', 11 * u, halo));
+      }
+    });
+    // kontrolní bod
+    if (st.probe.on) {
+      var px = kind === 'plan' ? X(st.probe.x) : X(st.probe.y), py = kind === 'plan' ? Y(st.probe.y) : Y(st.probe.z), c = 6 * u;
+      g.push('<g class="v-probe" stroke-width="' + n2(1.4 * u) + '"><circle cx="' + n2(px) + '" cy="' + n2(py) + '" r="' + n2(3.5 * u) + '"/><path d="M' + n2(px - c) + ' ' + n2(py) + 'h' + n2(2 * c) + 'M' + n2(px) + ' ' + n2(py - c) + 'v' + n2(2 * c) + '"/></g>');
+      g.push(txt(px + 8 * u, py - 7 * u, 'P', 'v-ink', null, 11 * u, ' font-weight="600"'));
+    }
+    g.push('</g>'); o.push(g.join(''));
+
+    // grafické měřítko
+    var SB = [[1, 0.25], [2, 0.5], [5, 1], [10, 2], [20, 5], [50, 10], [100, 20]], sb = SB[0];
+    for (k = 0; k < SB.length; k++) if (SB[k][0] * s <= Math.max(pw * 0.42, 60 * u)) sb = SB[k];
+    var by = oy + ph + 22 * u, nseg = Math.round(sb[0] / sb[1]);
+    for (k = 0; k < nseg; k++) o.push('<rect x="' + n2(ox + k * sb[1] * s) + '" y="' + n2(by) + '" width="' + n2(sb[1] * s) + '" height="' + n2(5 * u) + '" class="' + (k % 2 ? 'v-sb1' : 'v-sb0') + '" stroke-width="' + n2(0.8 * u) + '"/>');
+    for (k = 0; k <= nseg; k++) if (sb[1] * s >= 20 * u || k === 0 || k === nseg) o.push(txt(ox + k * sb[1] * s, by - 4 * u, fmtIn(k * sb[1]), 'v-mut', 'middle', 9.5 * u));
+    o.push(txt(ox + sb[0] * s + 8 * u, by + 5.5 * u, 'm' + (exp ? '      Měřítko 1 : ' + exportN : ''), 'v-ink', null, 10.5 * u, ' xml:space="preserve"'));
+    // legenda
+    var lx = ox, ly = oy + ph + 50 * u;
+    lv.slice().reverse().forEach(function (m) {
+      var col = levelColor(m.level), t = fmtLv(m.level) + ' kW/m²';
+      o.push('<rect x="' + n2(lx) + '" y="' + n2(ly - 8 * u) + '" width="' + n2(14 * u) + '" height="' + n2(9 * u) + '" fill="' + col + '" fill-opacity="0.25" stroke="' + col + '" stroke-width="' + n2(1.6 * u) + '"/>');
+      o.push(txt(lx + 19 * u, ly, t, 'v-ink', null, 10.5 * u));
+      lx += (19 + t.length * 6.2 + 16) * u;
+    });
+    o.push('<line x1="' + n2(lx) + '" y1="' + n2(ly - 3.5 * u) + '" x2="' + n2(lx + 14 * u) + '" y2="' + n2(ly - 3.5 * u) + '" class="v-win" stroke-width="' + n2(4.5 * u) + '"/>');
+    o.push(txt(lx + 19 * u, ly, 'okna', 'v-ink', null, 10.5 * u));
+
+    var head = exp
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="' + n2(W) + 'mm" height="' + n2(H) + 'mm" viewBox="0 0 ' + n2(W) + ' ' + n2(H) + '" font-family="Arial, Helvetica, sans-serif"><style>.v-bg{fill:#fff}.v-plot{fill:#fff;stroke:#888}.v-ink{fill:#111}.v-mut{fill:#555}.v-g1{stroke:#e4e4e4}.v-g2{stroke:#c4c4c4}.v-wall{stroke:#111}.v-hatch{stroke:#777}.v-win{stroke:#e8590c}.v-ax{stroke:#555}.v-sb0{fill:#111;stroke:#111}.v-sb1{fill:#fff;stroke:#111}.v-probe{stroke:#111;fill:none}</style>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + n2(W) + ' ' + n2(H) + '" role="img" aria-label="' + title + ', ' + sub + '">';
+    return { svg: head + o.join('') + '</svg>', map: { kind: kind, ox: ox, oy: oy, pw: pw, ph: ph, s: s, U0: U0, V0: V0, V1: V1, F: F }, W: W, H: H };
+  }
+  function draw2D(coarse) {
+    if (ui.view === '3d' || !result || result.empty) { if (ui.view !== '3d') $('#svg-host').innerHTML = ''; return; }
+    var host = $('#svg-host'), W = host.clientWidth, H = host.clientHeight;
+    if (W < 50 || H < 50) return;
+    var v = ui[ui.view];
+    $('#out-cut').textContent = v.mode === 'cut' ? fmt(v.cut, 2) + ' m' : '';
+    var out = buildSVG(ui.view, W, H, 0, coarse);
+    host.innerHTML = out.svg; lastMap = out.map;
+  }
+  function tipMove(e) {
+    var tip = $('#tip');
+    if (!lastMap || !result || result.empty) { tip.hidden = true; return; }
+    var host = $('#svg-host'), rc = host.getBoundingClientRect(), m = lastMap, mx = e.clientX - rc.left, my = e.clientY - rc.top;
+    if (mx < m.ox || mx > m.ox + m.pw || my < m.oy || my > m.oy + m.ph) { tip.hidden = true; return; }
+    var a = m.U0 + (mx - m.ox) / m.s, c = m.kind === 'plan' ? m.V0 + (my - m.oy) / m.s : m.V1 - (my - m.oy) / m.s, v = ui[m.kind], d = result.derived, q = null, t;
+    var inFront = m.kind === 'plan' ? c > 0 : (a > 0 && c >= 0);
+    if (inFront) {
+      if (v.mode === 'cut') q = result.I * (m.kind === 'plan' ? Core.factor(a, c, v.cut, d.wins, result.mode) : Core.factor(v.cut, a, c, d.wins, result.mode));
+      else {
+        var F = m.F, fi = (a - F.u0) / F.du, fj = (c - F.v0) / F.dv;
+        if (fi >= 0 && fj >= 0 && fi <= F.nu - 1 && fj <= F.nv - 1) {
+          var i0 = Math.min(F.nu - 2, Math.floor(fi)), j0 = Math.min(F.nv - 2, Math.floor(fj)), ti = fi - i0, tj = fj - j0, D = F.data;
+          q = (D[i0 + j0 * F.nu] * (1 - ti) + D[i0 + 1 + j0 * F.nu] * ti) * (1 - tj) + (D[i0 + (j0 + 1) * F.nu] * (1 - ti) + D[i0 + 1 + (j0 + 1) * F.nu] * ti) * tj;
+        }
+      }
+    }
+    t = (m.kind === 'plan' ? 'x = ' + fmt(a, 2) + ' m, y = ' + fmt(c, 2) + ' m' : 'y = ' + fmt(a, 2) + ' m, z = ' + fmt(c, 2) + ' m');
+    if (q !== null) t += '<br>' + (v.mode === 'cut' ? 'q = ' : 'největší q v průmětu = ') + fmt(q, 2) + ' kW/m²';
+    else if (inFront && v.mode === 'env') t += '<br>q pod nejnižší hladinou';
+    tip.innerHTML = t; tip.hidden = false;
+    var tx = mx, ty = my; if (tx > rc.width - 250) tx -= 250; if (ty > rc.height - 60) ty -= 60;
+    tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
+  }
+  $('#svg-host').addEventListener('pointermove', tipMove);
+  $('#svg-host').addEventListener('pointerleave', function () { $('#tip').hidden = true; });
+
+  function exportSVG() {
+    if (!result || result.empty || ui.view === '3d') return;
+    var N = Number($('#sel-scale').value), out = buildSVG(ui.view, 0, 0, N, false), msg = $('#export-msg');
+    var svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + out.svg;
+    var name = (ui.view === 'plan' ? 'pudorys' : 'bokorys') + '-izoplochy-1-' + N + '.svg';
+    var size = 'výkres ' + fmt(out.W, 0) + ' × ' + fmt(out.H, 0) + ' mm';
+    if (downloads) {
+      downloads.save({ filename: name, data: svg }).then(function () { msg.textContent = 'Uloženo, ' + size + '.'; })
+        .catch(function (e) { msg.textContent = e && e.code === 'declined' ? 'Uložení zrušeno.' : 'Soubor se nepodařilo uložit.'; });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(svg).then(function () { msg.textContent = 'SVG je ve schránce, ' + size + '. Vložte ho do textového souboru s příponou .svg.'; })
+        .catch(function () { msg.textContent = 'Kopírování se nepodařilo.'; });
+    } else msg.textContent = 'Export v tomto zobrazení není dostupný.';
+  }
+
+  // ---------- 3D náhled (WebGL) ----------
+  var GLV = (function () {
+    var cv = $('#gl'), lab = $('#gl-labels'), ctx = lab.getContext('2d'), gl = null, uint32 = true;
+    var pMesh, pFlat, meshes = [], flats = [], lines = [], labels = [];
+    var cam = { t: [6, 3, 3], az: 0.62, el: 0.38, dist: 30 }, sceneR = 10, M = null, vw = 1, vh = 1, raf = 0;
+    try {
+      gl = cv.getContext('webgl2', { antialias: true, alpha: false });
+      if (!gl) { gl = cv.getContext('webgl', { antialias: true, alpha: false }); if (gl) uint32 = !!gl.getExtension('OES_element_index_uint'); }
+    } catch (e) { gl = null; }
+    if (!gl) {
+      var api0 = { setScene: function () {}, draw: function () {}, resize: function () {}, preset: function () {} };
+      $('#pane-3d').insertAdjacentHTML('beforeend', '<div class="empty" style="z-index:1">3D náhled potřebuje WebGL, který tento prohlížeč nenabízí. Půdorys a bokorys fungují dál.</div>');
+      return api0;
+    }
+    function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+    function prog(vs, fs, attrs) {
+      var p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      attrs.forEach(function (a, i) { gl.bindAttribLocation(p, i, a); }); gl.linkProgram(p); return p;
+    }
+    pMesh = prog('attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;varying vec3 vN;void main(){vN=aN;gl_Position=uM*vec4(aP,1.0);}',
+      'precision mediump float;varying vec3 vN;uniform vec3 uC;uniform float uA;uniform vec3 uL;void main(){float d=abs(dot(normalize(vN),uL));vec3 c=uC*(0.40+0.60*d)+vec3(0.12)*pow(d,10.0);gl_FragColor=vec4(c,uA);}', ['aP', 'aN']);
+    pFlat = prog('attribute vec3 aP;uniform mat4 uM;void main(){gl_Position=uM*vec4(aP,1.0);}', 'precision mediump float;uniform vec4 uC;void main(){gl_FragColor=uC;}', ['aP']);
+    var U = { mM: gl.getUniformLocation(pMesh, 'uM'), mC: gl.getUniformLocation(pMesh, 'uC'), mA: gl.getUniformLocation(pMesh, 'uA'), mL: gl.getUniformLocation(pMesh, 'uL'),
+              fM: gl.getUniformLocation(pFlat, 'uM'), fC: gl.getUniformLocation(pFlat, 'uC') };
+
+    function buf(target, data) { var b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW); return b; }
+    function hex(c) { c = c.trim(); if (c[0] !== '#' || c.length < 7) return [0.5, 0.5, 0.5]; return [parseInt(c.substr(1, 2), 16) / 255, parseInt(c.substr(3, 2), 16) / 255, parseInt(c.substr(5, 2), 16) / 255]; }
+    function token(n) { return hex(getComputedStyle(document.documentElement).getPropertyValue(n)); }
+    function free() {
+      meshes.concat(flats, lines).forEach(function (m) { ['p', 'n', 'i'].forEach(function (k) { if (m[k]) gl.deleteBuffer(m[k]); }); });
+      meshes = []; flats = []; lines = []; labels = [];
+    }
+    // uživatelské (x,y,z) -> GL (x, z, y)
+    function addMesh(level, pos, nrm, idx) {
+      var n = pos.length / 3, P = new Float32Array(pos.length), Nn = new Float32Array(pos.length), i;
+      for (i = 0; i < n; i++) { P[i * 3] = pos[i * 3]; P[i * 3 + 1] = pos[i * 3 + 2]; P[i * 3 + 2] = pos[i * 3 + 1]; Nn[i * 3] = nrm[i * 3]; Nn[i * 3 + 1] = nrm[i * 3 + 2]; Nn[i * 3 + 2] = nrm[i * 3 + 1]; }
+      var I = new Uint32Array(idx.length);
+      for (i = 0; i < idx.length; i += 3) { I[i] = idx[i]; I[i + 1] = idx[i + 2]; I[i + 2] = idx[i + 1]; }
+      if (uint32) meshes.push({ level: level, p: buf(gl.ARRAY_BUFFER, P), n: buf(gl.ARRAY_BUFFER, Nn), i: buf(gl.ELEMENT_ARRAY_BUFFER, I), count: I.length });
+      else {
+        var P2 = new Float32Array(I.length * 3), N2 = new Float32Array(I.length * 3);
+        for (i = 0; i < I.length; i++) { P2.set(P.subarray(I[i] * 3, I[i] * 3 + 3), i * 3); N2.set(Nn.subarray(I[i] * 3, I[i] * 3 + 3), i * 3); }
+        meshes.push({ level: level, p: buf(gl.ARRAY_BUFFER, P2), n: buf(gl.ARRAY_BUFFER, N2), i: null, count: I.length });
+      }
+    }
+    function quad(a, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3) { a.push(x0, z0, y0, x1, z1, y1, x2, z2, y2, x0, z0, y0, x2, z2, y2, x3, z3, y3); }
+    function seg(a, x0, y0, z0, x1, y1, z1) { a.push(x0, z0, y0, x1, z1, y1); }
+    function addFlat(arr, color, alpha) { if (arr.length) flats.push({ p: buf(gl.ARRAY_BUFFER, new Float32Array(arr)), count: arr.length / 3, color: color, alpha: alpha === undefined ? 1 : alpha }); }
+    function addLines(arr, color, alpha) { if (arr.length) lines.push({ p: buf(gl.ARRAY_BUFFER, new Float32Array(arr)), count: arr.length / 3, color: color, alpha: alpha === undefined ? 1 : alpha }); }
+
+    var scene = null;
+    function setScene(r) {
+      scene = r; free();
+      var d = r.derived, L = d.L, H = d.H, b = r.empty ? { x0: 0, x1: L, y1: 4, z0: 0, z1: H } : r.box;
+      var gx0 = Math.floor(Math.min(0, b.x0) - 0.5), gx1 = Math.ceil(Math.max(L, b.x1) + 0.5), gy1 = Math.ceil(b.y1 + 0.5), zt = Math.max(H, b.z1);
+      var step = (gx1 - gx0 > 80 || gy1 > 80) ? 5 : 1, a1 = [], a5 = [], k, wt = 0.35;
+      for (k = Math.ceil(gx0 / step) * step; k <= gx1; k += step) seg(k % (5 * step) === 0 ? a5 : a1, k, 0, 0, k, gy1, 0);
+      for (k = 0; k <= gy1; k += step) seg(k % (5 * step) === 0 ? a5 : a1, gx0, k, 0, gx1, k, 0);
+      addLines(a1, 'line-soft'); addLines(a5, 'line');
+      // stěna
+      var w = [];
+      quad(w, 0, 0, 0, L, 0, 0, L, 0, H, 0, 0, H); addFlat(w, 'wall'); w = [];
+      quad(w, 0, -wt, 0, L, -wt, 0, L, -wt, H, 0, -wt, H); quad(w, 0, -wt, H, L, -wt, H, L, 0, H, 0, 0, H);
+      quad(w, 0, -wt, 0, 0, 0, 0, 0, 0, H, 0, -wt, H); quad(w, L, -wt, 0, L, 0, 0, L, 0, H, L, -wt, H); addFlat(w, 'wall2');
+      var e = [], e2 = 0.012;
+      seg(e, 0, e2, 0, L, e2, 0); seg(e, L, e2, 0, L, e2, H); seg(e, L, e2, H, 0, e2, H); seg(e, 0, e2, H, 0, e2, 0);
+      seg(e, 0, -wt, H, L, -wt, H); seg(e, 0, -wt, H, 0, 0, H); seg(e, L, -wt, H, L, 0, H); seg(e, 0, -wt, 0, 0, -wt, H); seg(e, L, -wt, 0, L, -wt, H);
+      d.floorsZ.forEach(function (z, i) { if (i > 0 || z > 0) seg(e, 0, e2, z, L, e2, z); });
+      addLines(e, 'ink', 0.75);
+      var wq = [], wl = [];
+      d.wins.forEach(function (o) {
+        quad(wq, o.x0, 0.02, o.z0, o.x1, 0.02, o.z0, o.x1, 0.02, o.z1, o.x0, 0.02, o.z1);
+        seg(wl, o.x0, 0.03, o.z0, o.x1, 0.03, o.z0); seg(wl, o.x1, 0.03, o.z0, o.x1, 0.03, o.z1); seg(wl, o.x1, 0.03, o.z1, o.x0, 0.03, o.z1); seg(wl, o.x0, 0.03, o.z1, o.x0, 0.03, o.z0);
+      });
+      addFlat(wq, 'fire'); addLines(wl, 'ink', 0.6);
+      if (!r.empty) {
+        var g = r.grid;
+        r.levels.forEach(function (m) {
+          if (!m.idx.length) return;
+          addMesh(m.level, m.pos, m.nrm, m.idx);
+          var fp = [];
+          Core.contours(r.plan, g.nx, g.ny, g.x0, g.dx, 0, g.dy, m.level).forEach(function (lp) {
+            for (var i = 0; i < lp.length; i++) { var q = lp[(i + 1) % lp.length]; if (lp[i][1] < 1e-6 && q[1] < 1e-6) continue; seg(fp, lp[i][0], lp[i][1], 0.015, q[0], q[1], 0.015); }
+          });
+          lines.push({ p: buf(gl.ARRAY_BUFFER, new Float32Array(fp)), count: fp.length / 3, rgb: hex(levelColor(m.level)), alpha: 1, level: m.level });
+        });
+      }
+      // popisky os
+      var ls = (gx1 - gx0 > 40 || gy1 > 40) ? 5 : (gx1 - gx0 > 16 || gy1 > 16 ? 2 : 1);
+      for (k = Math.ceil(gx0 / ls) * ls; k <= gx1; k += ls) labels.push({ p: [k, gy1 + 0.45, 0], t: fmtIn(k) });
+      for (k = 0; k < gy1; k += ls) labels.push({ p: [gx1 + 0.55, k, 0], t: fmtIn(k) });
+      for (k = ls; k <= zt + 0.01; k += ls) labels.push({ p: [-0.35, -wt, k], t: fmtIn(k) });
+      labels.push({ p: [(gx0 + gx1) / 2, gy1 + 1.5, 0], t: 'x [m]', b: 1 }, { p: [gx1 + 1.7, gy1 / 2, 0], t: 'y [m]', b: 1 }, { p: [-0.9, -wt, zt + 0.7], t: 'z [m]', b: 1 });
+      var cx = (gx0 + gx1) / 2, cy = gy1 / 2, cz = zt / 2;
+      var nt = [cx, cz, cy], nr = 0.5 * Math.sqrt(Math.pow(gx1 - gx0, 2) + gy1 * gy1 + zt * zt);
+      if (Math.abs(nr - sceneR) > 0.02 * sceneR || Math.abs(nt[0] - cam.t[0]) + Math.abs(nt[1] - cam.t[1]) + Math.abs(nt[2] - cam.t[2]) > 0.05 * nr) { cam.t = nt; sceneR = nr; cam.dist = fit(); }
+      draw();
+    }
+
+    function fit() { var w = cv.clientWidth || vw, h = cv.clientHeight || vh; return sceneR / (Math.sin(0.3) * Math.min(1, w / Math.max(h, 1))) * 0.92; }
+    function norm(a) { var l = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+    function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+    function mul(a, b) { var o = new Float32Array(16), i, j; for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) o[j * 4 + i] = a[i] * b[j * 4] + a[4 + i] * b[j * 4 + 1] + a[8 + i] * b[j * 4 + 2] + a[12 + i] * b[j * 4 + 3]; return o; }
+    var basis = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+    function matrices() {
+      var ce = Math.cos(cam.el), eye = [cam.t[0] + cam.dist * Math.sin(cam.az) * ce, cam.t[1] + cam.dist * Math.sin(cam.el), cam.t[2] + cam.dist * Math.cos(cam.az) * ce];
+      var z = norm([eye[0] - cam.t[0], eye[1] - cam.t[1], eye[2] - cam.t[2]]), x = norm(cross([0, 1, 0], z)), y = cross(z, x);
+      basis = { x: x, y: y, z: z };
+      var V = [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]), -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]), -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]), 1];
+      var n = Math.max(0.05, cam.dist * 0.03), f = cam.dist * 6 + sceneR * 4, t = 1 / Math.tan(0.3), asp = vw / vh;
+      var P = [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0];
+      M = mul(P, V);
+    }
+    function project(p) { // uživatelské souřadnice
+      var x = p[0], y = p[2], z = p[1];
+      var cx = M[0] * x + M[4] * y + M[8] * z + M[12], cy = M[1] * x + M[5] * y + M[9] * z + M[13], cw = M[3] * x + M[7] * y + M[11] * z + M[15];
+      if (cw <= 0.001) return null;
+      return [(cx / cw * 0.5 + 0.5) * vw, (1 - (cy / cw * 0.5 + 0.5)) * vh];
+    }
+    function resize() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+      if (w < 2 || h < 2) return;
+      vw = w; vh = h;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = lab.width = Math.round(w * dpr); cv.height = lab.height = Math.round(h * dpr); }
+      draw();
+    }
+    function draw() { if (!raf) raf = requestAnimationFrame(render); }
+    function render() {
+      raf = 0;
+      if (ui.view !== '3d' || !scene || cv.width < 2) return;
+      var dpr = cv.width / vw, C = { stage: token('--stage'), 'line-soft': token('--line-soft'), line: token('--line'), ink: token('--ink'), wall: token('--wall'), fire: token('--fire'), muted: token('--muted') };
+      C.wall2 = [C.wall[0] * 0.82, C.wall[1] * 0.82, C.wall[2] * 0.82];
+      matrices();
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.clearColor(C.stage[0], C.stage[1], C.stage[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(pFlat); gl.uniformMatrix4fv(U.fM, false, M); gl.enableVertexAttribArray(0); gl.disableVertexAttribArray(1);
+      function flat(o, mode) {
+        if (o.level !== undefined && ui.hidden[o.level]) return;
+        var c = o.rgb || C[o.color]; gl.uniform4f(U.fC, c[0], c[1], c[2], o.alpha);
+        gl.bindBuffer(gl.ARRAY_BUFFER, o.p); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0); gl.drawArrays(mode, 0, o.count);
+      }
+      lines.slice(0, 2).forEach(function (o) { flat(o, gl.LINES); });
+      gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1);
+      flats.forEach(function (o) { flat(o, gl.TRIANGLES); });
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+      lines.slice(2).forEach(function (o) { flat(o, gl.LINES); });
+      // kontrolní bod
+      if (st.probe.on) {
+        var p = st.probe, c = 0.25, arr = new Float32Array([p.x - c, p.z, p.y, p.x + c, p.z, p.y, p.x, p.z - c, p.y, p.x, p.z + c, p.y, p.x, p.z, p.y - c, p.x, p.z, p.y + c, p.x, 0, p.y, p.x, p.z, p.y]);
+        var pb = buf(gl.ARRAY_BUFFER, arr); gl.uniform4f(U.fC, C.ink[0], C.ink[1], C.ink[2], 1);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.LINES, 0, 8); gl.deleteBuffer(pb);
+      }
+      // izoplochy: nejdřív odvrácené stěny zvenku dovnitř, pak přivrácené zevnitř ven
+      gl.useProgram(pMesh); gl.uniformMatrix4fv(U.mM, false, M); gl.enableVertexAttribArray(1);
+      var Ld = norm([basis.z[0] + 0.3 * basis.x[0] + 0.45 * basis.y[0], basis.z[1] + 0.3 * basis.x[1] + 0.45 * basis.y[1], basis.z[2] + 0.3 * basis.x[2] + 0.45 * basis.y[2]]);
+      gl.uniform3f(U.mL, Ld[0], Ld[1], Ld[2]); gl.uniform1f(U.mA, ui.alpha);
+      var opaque = ui.alpha >= 0.995;
+      gl.depthMask(opaque);
+      function mesh(m) {
+        if (ui.hidden[m.level]) return;
+        var c = hex(levelColor(m.level)); gl.uniform3f(U.mC, c[0], c[1], c[2]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.p); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.n); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+        if (m.i) { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.i); gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0); }
+        else gl.drawArrays(gl.TRIANGLES, 0, m.count);
+      }
+      if (opaque) meshes.forEach(mesh);
+      else {
+        gl.enable(gl.CULL_FACE);
+        gl.cullFace(gl.FRONT); meshes.forEach(mesh);
+        gl.cullFace(gl.BACK); meshes.slice().reverse().forEach(mesh);
+        gl.disable(gl.CULL_FACE);
+      }
+      gl.depthMask(true);
+      // popisky
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, vw, vh);
+      var css = getComputedStyle(document.documentElement), mono = css.getPropertyValue('--font-mono') || 'monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      labels.forEach(function (l) {
+        var s = project(l.p); if (!s) return;
+        ctx.font = (l.b ? '600 12px ' : '11px ') + mono; ctx.fillStyle = css.getPropertyValue(l.b ? '--ink' : '--muted'); ctx.fillText(l.t, s[0], s[1]);
+      });
+      if (st.probe.on) {
+        var sp = project([st.probe.x, st.probe.y, st.probe.z]);
+        if (sp) {
+          var t = 'P  ' + fmt(probeQ(), 1) + ' kW/m²'; ctx.font = '600 12px ' + mono; ctx.textAlign = 'left';
+          var tw = ctx.measureText(t).width; ctx.fillStyle = css.getPropertyValue('--panel'); ctx.globalAlpha = 0.85; ctx.fillRect(sp[0] + 8, sp[1] - 20, tw + 10, 18); ctx.globalAlpha = 1;
+          ctx.fillStyle = css.getPropertyValue('--ink'); ctx.fillText(t, sp[0] + 13, sp[1] - 10);
+        }
+      }
+    }
+    function preset(v) {
+      if (v === 'iso') { cam.az = 0.62; cam.el = 0.38; } else if (v === 'front') { cam.az = 0; cam.el = 0.02; }
+      else if (v === 'top') { cam.az = 0; cam.el = Math.PI / 2 - 0.002; } else { cam.az = -Math.PI / 2; cam.el = 0.02; }
+      if (scene) { cam.dist = fit(); }
+      draw();
+    }
+    // ovládání
+    var ptrs = {}, pinch = 0;
+    lab.addEventListener('pointerdown', function (e) { lab.setPointerCapture(e.pointerId); ptrs[e.pointerId] = [e.clientX, e.clientY]; pinch = 0; e.preventDefault(); });
+    lab.addEventListener('pointermove', function (e) {
+      var p = ptrs[e.pointerId]; if (!p) return;
+      var ids = Object.keys(ptrs), dx = e.clientX - p[0], dy = e.clientY - p[1];
+      ptrs[e.pointerId] = [e.clientX, e.clientY];
+      if (ids.length >= 2) {
+        var a = ptrs[ids[0]], b = ptrs[ids[1]], dd = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinch) cam.dist = clamp(cam.dist * pinch / dd, sceneR * 0.15, sceneR * 12);
+        pinch = dd;
+      } else if (e.shiftKey || e.buttons === 2 || e.buttons === 4) {
+        var k = cam.dist * 2 * Math.tan(0.3) / vh;
+        for (var i = 0; i < 3; i++) cam.t[i] += (-dx * basis.x[i] + dy * basis.y[i]) * k;
+      } else { cam.az -= dx * 0.007; cam.el = clamp(cam.el + dy * 0.007, -0.15, Math.PI / 2 - 0.002); }
+      draw();
+    });
+    function up(e) { delete ptrs[e.pointerId]; pinch = 0; }
+    lab.addEventListener('pointerup', up); lab.addEventListener('pointercancel', up);
+    lab.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    lab.addEventListener('wheel', function (e) { e.preventDefault(); cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), sceneR * 0.15, sceneR * 12); draw(); }, { passive: false });
+    return { setScene: setScene, draw: draw, resize: resize, preset: preset };
+  })();
+
+  // ---------- start ----------
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { if (ui.view === '3d') GLV.resize(); else draw2D(false); }).observe($('#stage'));
+  else window.addEventListener('resize', function () { if (ui.view === '3d') GLV.resize(); else draw2D(false); });
+  new MutationObserver(function () { GLV.draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (window.matchMedia) { var mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', function () { GLV.draw(); }); }
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('downloads').then(function (d) { downloads = d; if (!d) $('#btn-export').textContent = 'Kopírovat SVG'; }).catch(function () {});
+  } else $('#btn-export').textContent = 'Kopírovat SVG';
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { GLV.draw(); });
+  renderStatic(); renderSummary(null); renderProbe(); showView(); run();
+})();
+
+</script>
+</body>
+</html>
