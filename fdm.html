@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fire Demand Model – potřeba vody pro hašení</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a data plate. Left = the input sheet of the original program, right = instrument panel
+   (verdict, 3D room with a time scrubber, small-multiple charts). Numbers are always monospaced. */
+:root{
+  --bg:#edf0f2; --surface:#ffffff; --sunken:#e3e8eb; --ink:#13212b; --muted:#566772; --line:#cdd5da;
+  --fire:#d5401b; --fire-soft:#fbe3da; --water:#0d7ba3; --water-soft:#d9eef6; --ok:#23804f; --ok-soft:#dcefe4; --warn:#a96a12; --warn-soft:#f6ead2;
+  --wall:#8a6d1f; --floor:#6b5b95; --scene:#dfe6ea;
+  --f-display:"Saira Condensed","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f171d; --surface:#17222a; --sunken:#0b1217; --ink:#e4ecf0; --muted:#8fa0ab; --line:#2a3944;
+    --fire:#ff6d42; --fire-soft:#3b1d14; --water:#4bb9de; --water-soft:#12303c; --ok:#5ccb92; --ok-soft:#143325; --warn:#e2ab52; --warn-soft:#38290f;
+    --wall:#d9b548; --floor:#a898d8; --scene:#0b1217; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f171d; --surface:#17222a; --sunken:#0b1217; --ink:#e4ecf0; --muted:#8fa0ab; --line:#2a3944;
+  --fire:#ff6d42; --fire-soft:#3b1d14; --water:#4bb9de; --water-soft:#12303c; --ok:#5ccb92; --ok-soft:#143325; --warn:#e2ab52; --warn-soft:#38290f;
+  --wall:#d9b548; --floor:#a898d8; --scene:#0b1217; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.02em}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.plate{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 28px;padding:18px 24px 0;border-bottom:1px solid var(--line);background:var(--surface)}
+.brand{display:flex;flex-direction:column;gap:2px;padding-bottom:12px;border-left:6px solid var(--fire);padding-left:14px}
+.brand h1{font-size:34px;font-weight:700;text-transform:uppercase;line-height:1}
+.brand p{margin:0;color:var(--muted);font-size:13.5px;max-width:62ch}
+.tabs{display:flex;gap:2px;margin-left:auto;flex-wrap:wrap}
+.tab{border:1px solid var(--line);border-bottom:none;background:var(--sunken);padding:9px 16px 10px;cursor:pointer;font-family:var(--f-display);font-size:19px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-radius:3px 3px 0 0;display:flex;gap:9px;align-items:baseline}
+.tab b{font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink);box-shadow:inset 0 3px 0 var(--fire)}
+.tab:hover{color:var(--ink)}
+
+.shell{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:20px;padding:20px 24px 40px;align-items:start}
+@media (max-width:980px){.shell{grid-template-columns:minmax(0,1fr);padding:16px}.plate{padding:14px 16px 0}.tabs{margin-left:0}}
+
+/* ---- input sheet ---- */
+.sheet,.panel{min-width:0}.vent input,.fld input,.fld select{min-width:0;width:100%}
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:4px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.sheet-head h2{font-size:21px;text-transform:uppercase}
+.sheet-head h2{white-space:nowrap}.sheet-head select{min-width:0;flex:1 1 0;max-width:100%}
+.sheet select{background:var(--sunken);border:1px solid var(--line);border-radius:3px;padding:5px 8px;max-width:100%}
+details.grp{border-bottom:1px solid var(--line)}
+details.grp>summary{list-style:none;cursor:pointer;padding:10px 14px;font-family:var(--f-display);font-size:17px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary::after{content:"+";font-family:var(--f-mono);color:var(--muted)}
+details.grp[open]>summary::after{content:"–"}
+.grp-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:7px}
+.fld{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:8px;align-items:center}
+.fld label{font-size:13.5px}
+.fld label small{display:block;color:var(--muted);font-size:11.5px;line-height:1.25}
+.fld .inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:3px;background:var(--sunken);overflow:hidden}
+.fld input,.vent input{width:100%;min-width:0;border:0;background:transparent;padding:5px 6px;text-align:right;font-family:var(--f-mono);font-size:13px;-moz-appearance:textfield}
+.fld input::-webkit-outer-spin-button,.fld input::-webkit-inner-spin-button,.vent input::-webkit-outer-spin-button,.vent input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.fld select{width:100%;font-size:13px}
+.fld.wide{grid-template-columns:1fr}
+.unit{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);padding:0 6px 0 2px;white-space:nowrap}
+.fld .inp:focus-within,.vent .cell:focus-within{outline:2px solid var(--water);outline-offset:1px}
+.fld input:focus,.vent input:focus{outline:none}
+.check{display:flex;gap:8px;align-items:center;font-size:13.5px}
+.vent-table{display:flex;flex-direction:column;gap:5px}
+.vent{display:grid;gap:4px;align-items:center}
+.vent.w{grid-template-columns:18px repeat(5,minmax(0,1fr)) 24px}
+.vent.r{grid-template-columns:18px repeat(4,minmax(0,1fr)) 24px}
+.vent .cell{border:1px solid var(--line);border-radius:3px;background:var(--sunken)}
+.vent .hd{font-size:10.5px;color:var(--muted);line-height:1.15;text-align:right;padding-right:3px}
+.vent .ix{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.mini{border:1px solid var(--line);background:var(--surface);border-radius:3px;cursor:pointer;padding:3px 8px;font-size:12.5px}
+.mini:hover{border-color:var(--ink)}
+.x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0}
+.x:hover{color:var(--fire)}
+.note{font-size:12px;color:var(--muted);margin:0}
+.runbar{position:sticky;bottom:0;background:var(--surface);padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;border-radius:0 0 4px 4px}
+.go{background:var(--fire);color:#fff;border:0;border-radius:3px;padding:10px 18px;font-family:var(--f-display);font-size:19px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;flex:1}
+.go:hover{filter:brightness(1.08)}
+.go:disabled{opacity:.55;cursor:progress}
+.ghost{background:none;border:1px solid var(--line);border-radius:3px;padding:9px 12px;cursor:pointer}
+.ghost:hover{border-color:var(--ink)}
+
+/* ---- results ---- */
+.panel{display:flex;flex-direction:column;gap:16px;min-width:0}
+.view[hidden]{display:none}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:4px;display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(110px,1fr));}
+@media (max-width:1180px){.verdict{grid-template-columns:repeat(2,minmax(0,1fr))}.verdict .state{grid-column:1/-1}}
+.verdict>div{padding:14px 16px;border-right:1px solid var(--line);min-width:0}
+.verdict>div:last-child{border-right:0}
+.state{display:flex;flex-direction:column;gap:6px;justify-content:center}
+.pill{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;font-family:var(--f-display);font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 12px;border-radius:3px}
+.pill::before{content:"";width:10px;height:10px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--fire-soft);color:var(--fire)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.state p{margin:0;font-size:13.5px;color:var(--muted)}
+.tile .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.tile .v{font-family:var(--f-mono);font-size:28px;font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;color:var(--muted);font-weight:400}
+.tile .s{font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline;padding:11px 14px;border-bottom:1px solid var(--line)}
+.card-head h2{font-size:20px;text-transform:uppercase}
+.card-head p{margin:0;font-size:12.5px;color:var(--muted)}
+.stage{position:relative;background:var(--scene);height:430px;touch-action:none;overflow:hidden}
+@media (max-width:700px){.stage{height:320px}}
+.stage canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;left:12px;top:10px;display:grid;grid-template-columns:auto auto;gap:1px 12px;font-family:var(--f-mono);font-size:12px;background:color-mix(in srgb,var(--surface) 82%,transparent);border:1px solid var(--line);border-radius:3px;padding:8px 10px;pointer-events:none}
+.hud span:nth-child(odd){color:var(--muted)}
+.hud span:nth-child(even){text-align:right}
+.legend{position:absolute;right:12px;top:10px;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);background:color-mix(in srgb,var(--surface) 82%,transparent);border:1px solid var(--line);border-radius:3px;padding:7px 9px;pointer-events:none}
+.legend .bar{width:150px;height:9px;border-radius:2px;margin:3px 0 2px}
+.legend .tk{display:flex;justify-content:space-between}
+.keys{position:absolute;left:12px;bottom:10px;display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);pointer-events:none}
+.keys i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:baseline}
+.scrub{display:flex;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+.scrub input[type=range]{flex:1;accent-color:var(--fire);min-width:0}
+.play{width:38px;height:34px;border:1px solid var(--line);background:var(--surface);border-radius:3px;cursor:pointer;font-size:14px}
+.play:hover{border-color:var(--ink)}
+.clock{font-family:var(--f-mono);font-size:13px;min-width:92px;text-align:right}
+.events{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--sunken);cursor:pointer}
+.chip b{font-family:var(--f-mono);font-weight:500}
+.chip:hover{border-color:var(--ink)}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}
+@media (max-width:760px){.charts{grid-template-columns:1fr}}
+.chart{background:var(--surface);padding:10px 12px 6px;min-width:0}
+.chart.big{grid-column:1/-1}
+.chart h3{font-size:15px;text-transform:uppercase;letter-spacing:.05em;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.chart h3 span{font-family:var(--f-body);font-size:11.5px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
+.chart h3 span i{display:inline-block;width:14px;height:3px;margin-right:5px;vertical-align:middle}
+.chart canvas{width:100%;height:190px;display:block;margin-top:4px}
+.chart.big canvas{height:270px}
+.tablewrap{overflow:auto;max-height:420px}
+table{border-collapse:collapse;width:100%;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:4px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:var(--sunken);font-family:var(--f-body);font-weight:500;font-size:11.5px;color:var(--muted);vertical-align:bottom}
+tbody tr:hover{background:var(--sunken)}
+.msg{border:1px solid var(--fire);background:var(--fire-soft);color:var(--ink);border-radius:4px;padding:12px 14px;font-size:14px}
+.msg b{color:var(--fire)}
+.progress{height:8px;background:var(--sunken);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.progress i{display:block;height:100%;background:var(--water);width:0}
+.rowflex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.foot{padding:0 24px 28px;color:var(--muted);font-size:12.5px;max-width:95ch}
+.foot a{color:inherit}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<header class="plate">
+  <div class="brand">
+    <h1>Fire Demand Model</h1>
+    <p>Odhad množství vody potřebného k dostání požáru místnosti pod kontrolu. Výpočet převzat z programu FDM pro DOS (Mission Research Corp., 1992).</p>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Režim programu">
+    <button class="tab" role="tab" id="tab-simulace" data-view="simulace" aria-selected="true"><b>1</b>Simulace</button>
+    <button class="tab" role="tab" id="tab-mezni-krivka" data-view="mezni-krivka" aria-selected="false"><b>2</b>Mezní křivka</button>
+    <button class="tab" role="tab" id="tab-porovnani" data-view="porovnani" aria-selected="false"><b>3</b>Porovnání křivek</button>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sheet" aria-label="Vstupní údaje">
+    <div class="sheet-head">
+      <h2>Vstupní údaje</h2>
+      <select id="preset" aria-label="Vzorové zadání">
+        <option value="">Vzorová zadání…</option>
+        <option value="s1">Vzor 1: malá místnost, 36,5 l/min</option>
+        <option value="s2">Vzor 2: křivka, 25 % paliva v dosahu</option>
+        <option value="s3">Vzor 3: křivka, 75 % paliva v dosahu</option>
+      </select>
+    </div>
+    <form id="form" novalidate></form>
+    <div class="runbar">
+      <button class="go" id="run" type="button">Spustit simulaci</button>
+      <button class="ghost" id="stop" type="button" hidden>Zastavit</button>
+    </div>
+  </aside>
+
+  <main class="panel">
+    <div id="error" class="msg" hidden></div>
+
+    <!-- 1: single simulation -->
+    <section class="view panel" id="view-simulace">
+      <div class="verdict" id="verdict"></div>
+      <div class="card">
+        <div class="card-head"><h2>Místnost v čase</h2><p>Tažením otáčíte, kolečkem přibližujete. Barva stěn, podlahy a plynu odpovídá teplotě.</p></div>
+        <div class="stage" id="stage">
+          <canvas id="gl"></canvas>
+          <div class="hud" id="hud"></div>
+          <div class="legend"><div>teplota °C</div><div class="bar" id="tbar"></div><div class="tk"><span>20</span><span>400</span><span>800</span><span>1200</span></div></div>
+          <div class="keys"><span><i style="background:#ff8a1e"></i>plameny</span><span><i style="background:#39a9e0"></i>vodní proud</span><span><i style="background:#c9d3d9"></i>pára</span><span><i style="background:#e0452b"></i>odtok horkých plynů</span><span><i style="background:#3f7fc4"></i>přítok vzduchu</span></div>
+        </div>
+        <div class="scrub">
+          <button class="play" id="play" type="button" aria-label="Přehrát průběh">▶</button>
+          <input type="range" id="time" min="0" max="1000" value="0" step="1" aria-label="Čas simulace">
+          <div class="clock num" id="clock">0,00 min</div>
+        </div>
+        <div class="events" id="events"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Průběh veličin</h2><p>Svislá čára sleduje čas zvolený na posuvníku.</p></div>
+        <div class="charts">
+          <div class="chart big"><h3>Teploty <span><i style="background:var(--fire)"></i>plyn</span><span><i style="background:var(--wall)"></i>stěny a strop</span><span><i style="background:var(--floor)"></i>podlaha</span></h3><canvas id="c-temp"></canvas></div>
+          <div class="chart"><h3>Tepelný výkon <span>MW</span></h3><canvas id="c-hrr"></canvas></div>
+          <div class="chart"><h3>Zbývající palivo <span>% původní hmotnosti</span></h3><canvas id="c-fuel"></canvas></div>
+          <div class="chart"><h3>Voda <span><i style="background:var(--water)"></i>aplikovaná</span><span><i style="background:var(--muted)"></i>odpařená</span><span>litry</span></h3><canvas id="c-water"></canvas></div>
+          <div class="chart"><h3>Proudění otvory <span><i style="background:var(--fire)"></i>odtok plynů</span><span><i style="background:var(--water)"></i>přítok vzduchu</span><span>kg/min</span></h3><canvas id="c-flow"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Tabulka výsledků</h2><div class="rowflex"><p>Stejné řádky jako ve výpisu OUTFDM.LOG.</p><button class="mini" id="copy-table" type="button">Kopírovat jako CSV</button></div></div>
+        <div class="tablewrap"><table id="table"></table></div>
+      </div>
+    </section>
+
+    <!-- 2: failure line -->
+    <section class="view panel" id="view-mezni-krivka" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Mezní křivka zdolání požáru</h2><p id="fl-caption"></p></div>
+        <div style="padding:12px 14px" id="fl-progress-box" hidden>
+          <div class="progress"><i id="fl-bar"></i></div>
+          <p class="note num" id="fl-status" style="margin-top:6px"></p>
+        </div>
+        <div class="chart big" style="padding:12px 14px"><h3>Nejmenší průtok, který požár zvládne <span><i style="background:var(--fire)"></i>mezní křivka</span><span><i style="background:var(--water);height:6px;width:6px;border-radius:50%"></i>úspěšné simulace</span></h3><canvas id="c-fl" style="height:360px"></canvas></div>
+        <div style="padding:0 14px 12px" class="rowflex">
+          <p class="note" style="max-width:70ch">Nad křivkou voda požár dostane pod kontrolu, pod ní ne. Program pro každou velikost kapek snižuje průtok, dokud hašení neselže.</p>
+          <span style="flex:1"></span>
+          <button class="mini" id="fl-add" type="button">Přidat křivku do porovnání</button>
+          <button class="mini" id="copy-fl" type="button">Kopírovat jako CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Body křivky</h2><p>Spotřeba vody platí pro nejnižší úspěšný průtok.</p></div>
+        <div class="tablewrap"><table id="fl-table"></table></div>
+      </div>
+    </section>
+
+    <!-- 3: cross-plot -->
+    <section class="view panel" id="view-porovnani" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Porovnání mezních křivek</h2><p>Křivky sem přidáte tlačítkem v záložce Mezní křivka.</p></div>
+        <div class="chart big" style="padding:12px 14px"><canvas id="c-x" style="height:380px"></canvas></div>
+        <div id="x-list" style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<p class="foot">Výpočetní jádro je strojový překlad původních numerických podprogramů (ACALC, BURN, MASSBL, WLHEAT, FLHEAT, WTRCON, WTRDEL) do JavaScriptu. Výsledky byly porovnány s původním programem spuštěným v emulátoru DOSu na vzorových i dalších zadáních. Model platí pro požár jedné místnosti po celkovém vzplanutí hašený ručním proudem; není náhradou za posouzení odborníkem. Jednotky odpovídají původnímu metrickému zadání (kcal, kg/cm²).</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="fdm-core.js"></script>
+<script>
+"use strict";
+/* ===================== input schema ===================== */
+const GROUPS = [
+  { id: 'room', title: 'Místnost', open: true, fields: [
+    ['floorArea', 'Plocha podlahy', 'm²'], ['wallArea', 'Plocha stěn a stropu', 'm²', 'bez podlahy, včetně otvorů'], ['height', 'Výška místnosti', 'm'] ] },
+  { id: 'vents', title: 'Otvory', open: true, custom: 'vents' },
+  { id: 'walls', title: 'Stěny, strop a podlaha', fields: [
+    ['thickness', 'Tloušťka', 'm'], ['segments', 'Počet vrstev výpočtu', '', 'doporučeno aspoň 20'], ['conductivity', 'Tepelná vodivost', 'kcal/m·min·°C'],
+    ['specHeat', 'Měrné teplo', 'kcal/m³·°C'], ['convCoef', 'Součinitel přestupu tepla', 'kcal/m²·min·°C^⅓'], ['emissivity', 'Emisivita stěny–plyn', '–'] ] },
+  { id: 'fuel', title: 'Palivo', open: true, custom: 'fuel', fields: [
+    ['fuelLoad', 'Požární zatížení', 'kg/m²', 'na plochu podlahy'], ['fuelArea', 'Povrch paliva', 'm²'], ['airFuel', 'Poměr vzduch/palivo', '–'], ['heatComb', 'Efektivní výhřevnost', 'kcal/kg'] ] },
+  { id: 'temps', title: 'Teploty', fields: [
+    ['tGasFlash', 'Plyn při vzplanutí', '°C'], ['tWallFlash', 'Stěny při vzplanutí', '°C'], ['tGasCtl', 'Plyn: požár pod kontrolou', '°C'], ['tWallCtl', 'Stěny: požár pod kontrolou', '°C'] ] },
+  { id: 'water', title: 'Hašení vodou', open: true, custom: 'water', fields: [
+    ['waterRate', 'Průtok vody', 'l/min', 'jen pro jednu simulaci'], ['dropSize', 'Střední velikost kapek', 'mm', 'objemový medián; jen pro jednu simulaci'], ['tWater', 'Začátek hašení', 'min', 'od celkového vzplanutí'],
+    ['exposedPct', 'Palivo v dosahu vody', '%'], ['nozzleP', 'Tlak na proudnici', 'kg/cm²', '1 kg/cm² ≈ 0,98 bar'], ['nozzleDist', 'Vzdálenost proudnice od otvoru', 'm'],
+    ['coneAngle', 'Vrcholový úhel kužele', '°'], ['sweep', 'Doba jednoho pokrytí', 's'] ] },
+  { id: 'range', title: 'Rozsah mezní křivky', fields: [
+    ['rateMin', 'Průtok od', 'l/min·m²', 'na plochu všech povrchů'], ['rateMax', 'Průtok do', 'l/min·m²'], ['rateInc', 'Krok průtoku', 'l/min·m²'],
+    ['dropMin', 'Kapky od', 'mm'], ['dropMax', 'Kapky do', 'mm'], ['dropInc', 'Krok kapek', 'mm'] ] },
+  { id: 'calc', title: 'Výpočet', fields: [
+    ['tLimit', 'Konec simulace', 'min'], ['divisor', 'Dělitel časového kroku', '', 'větší = jemnější krok; křivce stačí 10'] ] },
+];
+const FUEL_EXTRA = {
+  char: [['c1', 'Rychlost odhořívání', 'kg/m²·min'], ['c2', 'Podíl hořící pyrolýzou', '–'], ['c3', 'Podíl hořící jako uhlík', '–'], ['c4', 'Podíl úbytku pyrolýzou', '–'], ['c5', 'Podíl úbytku zuhelnatěním', '–'], ['charHeat', 'Výhřevnost zuhelnatělé vrstvy', 'kcal/kg']],
+  melt: [['fracPlume', 'Podíl vystavený plameni', '–', '0 = určí program'], ['plumeEmis', 'Emisivita vůči plameni', '–'], ['plumeRatio', 'Poměr teploty plamene a plynu', '–'], ['density', 'Hustota paliva', 'kg/m³'],
+    ['fuelThick', 'Tloušťka paliva', 'm', '0 = určí program'], ['heatGas', 'Teplo zplynění', 'kcal/kg'], ['tVap', 'Teplota vypařování/pyrolýzy', '°C'], ['fuelCp', 'Měrné teplo paliva', 'kcal/kg·°C'], ['fuelCond', 'Součinitel vedení tepla', 'kcal/m·min·°C']],
+  molten: [['enhBurn', 'Zrychlení hoření vodou', 'kg/m²·min']],
+  polar: [['tInc', 'Zvýšení teploty vypařování', '°C·kg/l', 'na litr vody a kg taveniny']],
+};
+const DEFAULTS = {
+  floorArea: 5.95, wallArea: 29.75, height: 2.44,
+  wallVents: [{ open: 0, close: 30, height: 1.515, width: 0.757, top: 1.515 }], roofVents: [],
+  thickness: 0.0253, segments: 20, conductivity: 0.00172, specHeat: 210, convCoef: 0.1, emissivity: 0.5,
+  fuelLoad: 32.95, fuelArea: 36.81, airFuel: 4.92, heatComb: 2210, fuelType: 'wood', state: 2,
+  c1: 0.372, c2: 0.872, c3: 0.128, c4: 0.932, c5: 0.068, charHeat: 8000,
+  fracPlume: 0, plumeEmis: 0.9, plumeRatio: 1.4, density: 970, fuelThick: 0, heatGas: 555, tVap: 350, fuelCp: 0.5, fuelCond: 0.003, enhBurn: 0.4, tInc: 5,
+  tGasFlash: 625, tWallFlash: 425, tGasCtl: 200, tWallCtl: 200,
+  waterRate: 36.5, dropSize: 0.93, tWater: 8.18, waterVent: 1, exposedPct: 75, nozzleP: 5.976, nozzleDist: 0, coneAngle: 60, sweep: 1, splatter: 0,
+  rateMin: 0.02, rateMax: 2.5, rateInc: 0.02, dropMin: 0.02, dropMax: 1, dropInc: 0.02,
+  tLimit: 29, divisor: 50,
+};
+const PRESETS = {
+  s1: { view: 'simulace', patch: {} },
+  s2: { view: 'mezni-krivka', patch: { exposedPct: 25, divisor: 10 } },
+  s3: { view: 'mezni-krivka', patch: { exposedPct: 75, divisor: 10 } },
+};
+const SAMPLES = {"25":{"line":[[0.245,87.108,1053.2],[0.265,69.972,851.6],[0.285,59.797,637],[0.305,52.657,570.4],[0.325,49.266,562.9],[0.345,47.124,521.2],[0.365,46.41,392.6],[0.385,46.41,349.1],[0.405,47.124,308.1],[0.425,47.838,289],[0.445,48.552,287.6],[0.465,49.266,289.3],[0.485,49.98,295.1],[0.505,50.694,303.6],[0.525,51.408,312.3],[0.545,52.836,307.9],[0.565,53.55,320.1],[0.585,54.978,318.5],[0.605,55.692,331.4],[0.625,57.12,332.3],[0.645,58.548,333.8],[0.665,59.262,348.3],[0.685,60.69,351.4],[0.705,62.118,354.7],[0.725,62.832,371.5],[0.745,64.26,372.3],[0.765,65.688,375.4],[0.785,66.402,410.3],[0.805,67.83,394.9],[0.825,69.258,399.1],[0.845,70.686,404.1],[0.865,71.4,420.6],[0.885,72.828,423],[0.905,74.256,427.4],[0.925,74.97,457.6],[0.945,76.398,447.3],[0.965,77.826,449.6],[0.985,78.54,466.2]],"pts":[[0.245,89.25],[0.245,88.54],[0.245,87.82],[0.245,87.11],[0.265,89.25],[0.265,88.54],[0.265,87.82],[0.265,87.11],[0.265,86.39],[0.265,85.68],[0.265,84.97],[0.265,84.25],[0.265,83.54],[0.265,82.82],[0.265,82.11],[0.265,81.4],[0.265,80.68],[0.265,79.97],[0.265,79.25],[0.265,78.54],[0.265,77.83],[0.265,77.11],[0.265,76.4],[0.265,75.68],[0.265,74.97],[0.265,74.26],[0.265,73.54],[0.265,72.83],[0.265,72.11],[0.265,71.4],[0.265,70.69],[0.265,69.97],[0.285,64.08],[0.285,63.37],[0.285,62.65],[0.285,61.94],[0.285,61.23],[0.285,60.51],[0.285,59.8],[0.305,61.94],[0.305,61.23],[0.305,60.51],[0.305,59.8],[0.305,59.08],[0.305,58.37],[0.305,57.66],[0.305,56.94],[0.305,56.23],[0.305,55.51],[0.305,54.8],[0.305,54.09],[0.305,53.37],[0.305,52.66],[0.325,49.27],[0.345,51.41],[0.345,50.69],[0.345,49.98],[0.345,49.27],[0.345,48.55],[0.345,47.84],[0.345,47.12],[0.365,49.27],[0.365,48.55],[0.365,47.84],[0.365,47.12],[0.365,46.41],[0.385,48.55],[0.385,47.84],[0.385,47.12],[0.385,46.41],[0.405,48.55],[0.405,47.84],[0.405,47.12],[0.425,49.27],[0.425,48.55],[0.425,47.84],[0.445,49.98],[0.445,49.27],[0.445,48.55],[0.465,50.69],[0.465,49.98],[0.465,49.27],[0.485,51.41],[0.485,50.69],[0.485,49.98],[0.505,52.12],[0.505,51.41],[0.505,50.69],[0.525,52.84],[0.525,52.12],[0.525,51.41],[0.545,53.55],[0.545,52.84],[0.565,54.98],[0.565,54.26],[0.565,53.55],[0.585,55.69],[0.585,54.98],[0.605,57.12],[0.605,56.41],[0.605,55.69],[0.625,57.83],[0.625,57.12],[0.645,59.26],[0.645,58.55],[0.665,60.69],[0.665,59.98],[0.665,59.26],[0.685,61.4],[0.685,60.69],[0.705,62.83],[0.705,62.12],[0.725,64.26],[0.725,63.55],[0.725,62.83],[0.745,64.97],[0.745,64.26],[0.765,66.4],[0.765,65.69],[0.785,67.83],[0.785,67.12],[0.785,66.4],[0.805,68.54],[0.805,67.83],[0.825,69.97],[0.825,69.26],[0.845,71.4],[0.845,70.69],[0.865,72.83],[0.865,72.11],[0.865,71.4],[0.885,73.54],[0.885,72.83],[0.905,74.97],[0.905,74.26],[0.925,76.4],[0.925,75.68],[0.925,74.97],[0.945,77.11],[0.945,76.4],[0.965,78.54],[0.965,77.83],[0.985,79.97],[0.985,79.25],[0.985,78.54]],"sims":232},"75":{"line":[[0.245,87.108,970],[0.265,69.972,735.7],[0.285,59.083,602.3],[0.305,51.765,521.9],[0.325,46.588,476.7],[0.345,43.018,426.1],[0.365,39.805,482.3],[0.385,38.377,365.5],[0.405,36.949,333.3],[0.425,35.521,362.6],[0.445,34.807,318.1],[0.465,34.093,304.1],[0.485,33.379,306.3],[0.505,32.665,321.8],[0.525,31.951,358.4],[0.545,31.951,225.1],[0.565,31.237,250.7],[0.585,30.523,309.1],[0.605,30.523,206.7],[0.625,29.809,248.6],[0.645,29.095,340.3],[0.665,29.095,233.1],[0.685,28.381,350.3],[0.705,28.381,213.1],[0.725,27.667,330.2],[0.745,27.667,209.7],[0.765,27.667,194.8],[0.785,26.953,217],[0.805,26.953,200.8],[0.825,26.239,228.5],[0.845,26.239,210.6],[0.865,25.525,254.5],[0.885,25.525,228.1],[0.905,25.525,216.7],[0.925,25.525,211.7],[0.945,25.525,226.6],[0.965,26.239,198.9],[0.985,26.239,222.6]],"pts":[[0.245,89.25],[0.245,88.54],[0.245,87.82],[0.245,87.11],[0.265,89.25],[0.265,88.54],[0.265,87.82],[0.265,87.11],[0.265,86.39],[0.265,85.68],[0.265,84.97],[0.265,84.25],[0.265,83.54],[0.265,82.82],[0.265,82.11],[0.265,81.4],[0.265,80.68],[0.265,79.97],[0.265,79.25],[0.265,78.54],[0.265,77.83],[0.265,77.11],[0.265,76.4],[0.265,75.68],[0.265,74.97],[0.265,74.26],[0.265,73.54],[0.265,72.83],[0.265,72.11],[0.265,71.4],[0.265,70.69],[0.265,69.97],[0.285,64.08],[0.285,63.37],[0.285,62.65],[0.285,61.94],[0.285,61.23],[0.285,60.51],[0.285,59.8],[0.285,59.08],[0.305,56.76],[0.305,56.05],[0.305,55.33],[0.305,54.62],[0.305,53.91],[0.305,53.19],[0.305,52.48],[0.305,51.76],[0.325,49.44],[0.325,48.73],[0.325,48.02],[0.325,47.3],[0.325,46.59],[0.345,48.73],[0.345,48.02],[0.345,47.3],[0.345,46.59],[0.345,45.87],[0.345,45.16],[0.345,44.45],[0.345,43.73],[0.345,43.02],[0.365,40.52],[0.365,39.81],[0.385,41.95],[0.385,41.23],[0.385,40.52],[0.385,39.81],[0.385,39.09],[0.385,38.38],[0.405,40.52],[0.405,39.81],[0.405,39.09],[0.405,38.38],[0.405,37.66],[0.405,36.95],[0.425,39.09],[0.425,38.38],[0.425,37.66],[0.425,36.95],[0.425,36.24],[0.425,35.52],[0.445,37.66],[0.445,36.95],[0.445,36.24],[0.445,35.52],[0.445,34.81],[0.465,36.95],[0.465,36.24],[0.465,35.52],[0.465,34.81],[0.465,34.09],[0.485,36.24],[0.485,35.52],[0.485,34.81],[0.485,34.09],[0.485,33.38],[0.505,35.52],[0.505,34.81],[0.505,34.09],[0.505,33.38],[0.505,32.67],[0.525,34.81],[0.525,34.09],[0.525,33.38],[0.525,32.67],[0.525,31.95],[0.545,34.09],[0.545,33.38],[0.545,32.67],[0.545,31.95],[0.565,34.09],[0.565,33.38],[0.565,32.67],[0.565,31.95],[0.565,31.24],[0.585,33.38],[0.585,32.67],[0.585,31.95],[0.585,31.24],[0.585,30.52],[0.605,32.67],[0.605,31.95],[0.605,31.24],[0.605,30.52],[0.625,32.67],[0.625,31.95],[0.625,31.24],[0.625,30.52],[0.625,29.81],[0.645,31.95],[0.645,31.24],[0.645,30.52],[0.645,29.81],[0.645,29.1],[0.665,31.24],[0.665,30.52],[0.665,29.81],[0.665,29.1],[0.685,31.24],[0.685,30.52],[0.685,29.81],[0.685,29.1],[0.685,28.38],[0.705,30.52],[0.705,29.81],[0.705,29.1],[0.705,28.38],[0.725,30.52],[0.725,29.81],[0.725,29.1],[0.725,28.38],[0.725,27.67],[0.745,29.81],[0.745,29.1],[0.745,28.38],[0.745,27.67],[0.765,29.81],[0.765,29.1],[0.765,28.38],[0.765,27.67],[0.785,29.81],[0.785,29.1],[0.785,28.38],[0.785,27.67],[0.785,26.95],[0.805,29.1],[0.805,28.38],[0.805,27.67],[0.805,26.95],[0.825,29.1],[0.825,28.38],[0.825,27.67],[0.825,26.95],[0.825,26.24],[0.845,28.38],[0.845,27.67],[0.845,26.95],[0.845,26.24],[0.865,28.38],[0.865,27.67],[0.865,26.95],[0.865,26.24],[0.865,25.53],[0.885,27.67],[0.885,26.95],[0.885,26.24],[0.885,25.53],[0.905,27.67],[0.905,26.95],[0.905,26.24],[0.905,25.53],[0.925,27.67],[0.925,26.95],[0.925,26.24],[0.925,25.53],[0.945,27.67],[0.945,26.95],[0.945,26.24],[0.945,25.53],[0.965,27.67],[0.965,26.95],[0.965,26.24],[0.985,28.38],[0.985,27.67],[0.985,26.95],[0.985,26.24]],"sims":294}};
+
+const $ = (id) => document.getElementById(id);
+const cs = (n, d = 1) => (Number(n) + 0 || 0).toLocaleString('cs-CZ', { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/^-(0(?:,0+)?)$/, '$1');
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let inputs = JSON.parse(JSON.stringify(DEFAULTS));
+let view = 'simulace';
+
+/* ===================== form ===================== */
+function fieldHtml([k, label, unit, hint]) {
+  return `<div class="fld"><label for="f-${k}">${label}${hint ? `<small>${hint}</small>` : ''}</label><div class="inp"><input id="f-${k}" type="number" step="any" inputmode="decimal" data-k="${k}">${unit ? `<span class="unit">${unit}</span>` : ''}</div></div>`;
+}
+function buildForm() {
+  let h = '';
+  for (const g of GROUPS) {
+    h += `<details class="grp" id="g-${g.id}"${g.open ? ' open' : ''}><summary>${g.title}</summary><div class="grp-body">`;
+    if (g.custom === 'vents') {
+      h += `<p class="note">Stěnové otvory (dveře, okna). Aspoň jeden musí být otevřený od času 0.</p><div class="vent-table" id="wv"></div><div><button class="mini" type="button" id="add-wv">+ stěnový otvor</button></div>
+            <p class="note" style="margin-top:6px">Střešní otvory (postupně se zvětšují).</p><div class="vent-table" id="rv"></div><div><button class="mini" type="button" id="add-rv">+ střešní otvor</button></div>`;
+    }
+    if (g.fields) h += g.fields.map(fieldHtml).join('');
+    if (g.custom === 'fuel') {
+      h += `<div class="fld"><label for="f-fuelType">Druh paliva</label><select id="f-fuelType"><option value="wood">dřevo, celulóza</option><option value="char">plast, zuhelnaťuje</option><option value="melt">plast, nezuhelnaťuje</option></select></div>
+            <div id="fx-char" class="grp-body" style="padding:0">${FUEL_EXTRA.char.map(fieldHtml).join('')}</div>
+            <div id="fx-melt" class="grp-body" style="padding:0"><div class="fld"><label for="f-state">Jak plast hoří</label><select id="f-state"><option value="2">pevný</option><option value="3">tavenina, nepolární</option><option value="4">tavenina, polární</option></select></div>${FUEL_EXTRA.melt.map(fieldHtml).join('')}
+              <div id="fx-molten" class="grp-body" style="padding:0">${FUEL_EXTRA.molten.map(fieldHtml).join('')}</div><div id="fx-polar" class="grp-body" style="padding:0">${FUEL_EXTRA.polar.map(fieldHtml).join('')}</div></div>`;
+    }
+    if (g.custom === 'water') {
+      h += `<div class="fld" id="fld-waterVent"><label for="f-waterVent">Otvor, kterým se hasí</label><select id="f-waterVent"></select></div>
+            <label class="check"><input type="checkbox" id="f-splatter"> Voda se tříští o strop</label>`;
+    }
+    h += '</div></details>';
+  }
+  $('form').innerHTML = h;
+}
+function ventRows() {
+  const w = inputs.wallVents, r = inputs.roofVents;
+  const cell = (list, i, k) => `<div class="cell"><input type="number" step="any" inputmode="decimal" data-list="${list}" data-i="${i}" data-k="${k}" id="v-${list}-${i}-${k}" value="${(list === 'wallVents' ? w : r)[i][k]}" aria-label="${k}"></div>`;
+  $('wv').innerHTML = `<div class="vent w"><span></span><span class="hd">otevřen od min</span><span class="hd">do min</span><span class="hd">výška m</span><span class="hd">šířka m</span><span class="hd">horní hrana m</span><span></span></div>` +
+    w.map((v, i) => `<div class="vent w"><span class="ix">${i + 1}</span>${['open', 'close', 'height', 'width', 'top'].map(k => cell('wallVents', i, k)).join('')}<button class="x" type="button" data-del="wallVents" data-i="${i}" aria-label="Odebrat otvor ${i + 1}"${w.length < 2 ? ' disabled style="visibility:hidden"' : ''}>×</button></div>`).join('');
+  $('rv').innerHTML = (r.length ? `<div class="vent r"><span></span><span class="hd">otevírání od min</span><span class="hd">zavřen v min</span><span class="hd">rychlost m²/min</span><span class="hd">konečná plocha m²</span><span></span></div>` : '') +
+    r.map((v, i) => `<div class="vent r"><span class="ix">${i + 1}</span>${['start', 'close', 'rate', 'area'].map(k => cell('roofVents', i, k)).join('')}<button class="x" type="button" data-del="roofVents" data-i="${i}" aria-label="Odebrat střešní otvor ${i + 1}">×</button></div>`).join('');
+  $('f-waterVent').innerHTML = w.map((v, i) => `<option value="${i + 1}">otvor ${i + 1}</option>`).join('');
+  if (inputs.waterVent > w.length) inputs.waterVent = 1;
+  $('f-waterVent').value = inputs.waterVent;
+  $('fld-waterVent').style.display = w.length > 1 ? '' : 'none';
+  $('add-wv').disabled = w.length >= 10; $('add-rv').disabled = r.length >= 10;
+}
+function fillForm() {
+  document.querySelectorAll('#form input[data-k]:not([data-list])').forEach(el => { el.value = inputs[el.dataset.k]; });
+  $('f-fuelType').value = inputs.fuelType; $('f-state').value = inputs.state; $('f-splatter').checked = !!inputs.splatter;
+  ventRows(); fuelVis();
+}
+function fuelVis() {
+  $('fx-char').style.display = inputs.fuelType === 'char' ? '' : 'none';
+  $('fx-melt').style.display = inputs.fuelType === 'melt' ? '' : 'none';
+  $('fx-molten').style.display = inputs.state >= 3 ? '' : 'none';
+  $('fx-polar').style.display = inputs.state === 4 ? '' : 'none';
+}
+function wireForm() {
+  const f = $('form');
+  f.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.list) { inputs[el.dataset.list][+el.dataset.i][el.dataset.k] = el.value === '' ? NaN : Number(el.value); return; }
+    if (el.dataset.k) { inputs[el.dataset.k] = el.value === '' ? NaN : Number(el.value); return; }
+  });
+  f.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.id === 'f-fuelType') { inputs.fuelType = el.value; fuelVis(); }
+    if (el.id === 'f-state') { inputs.state = Number(el.value); fuelVis(); }
+    if (el.id === 'f-splatter') inputs.splatter = el.checked ? 1 : 0;
+    if (el.id === 'f-waterVent') inputs.waterVent = Number(el.value);
+  });
+  f.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'add-wv') { inputs.wallVents.push({ open: 0, close: inputs.wallVents[0].close, height: 1, width: 1, top: Math.min(2, inputs.height) }); ventRows(); }
+    if (b.id === 'add-rv') { inputs.roofVents.push({ start: 2, close: inputs.wallVents[0].close, rate: 0.5, area: 1 }); ventRows(); }
+    if (b.dataset.del) { inputs[b.dataset.del].splice(+b.dataset.i, 1); ventRows(); }
+  });
+  f.addEventListener('submit', (e) => e.preventDefault());
+  $('preset').addEventListener('change', (e) => {
+    const p = PRESETS[e.target.value]; if (!p) return;
+    inputs = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), p.patch); fillForm(); setView(p.view); e.target.value = '';
+    if (p.view === 'simulace') runSim();
+  });
+}
+
+/* ===================== model input + validation ===================== */
+function modelInput() {
+  const o = Object.assign({}, inputs);
+  o.plastic = inputs.fuelType === 'wood' ? 0 : 1;
+  o.charring = inputs.fuelType === 'melt' ? 2 : 1;
+  o.wallVents = inputs.wallVents.map(v => Object.assign({}, v)); o.roofVents = inputs.roofVents.map(v => Object.assign({}, v));
+  delete o.fuelType;
+  return o;
+}
+function validate(mode) {
+  const e = [], i = inputs, pos = (k, n) => { if (!(i[k] > 0)) e.push(`${n} musí být kladné číslo.`); };
+  pos('floorArea', 'Plocha podlahy'); pos('wallArea', 'Plocha stěn a stropu'); pos('height', 'Výška místnosti'); pos('thickness', 'Tloušťka stěn');
+  pos('conductivity', 'Tepelná vodivost'); pos('specHeat', 'Měrné teplo stěn'); pos('fuelLoad', 'Požární zatížení'); pos('fuelArea', 'Povrch paliva'); pos('airFuel', 'Poměr vzduch/palivo');
+  pos('heatComb', 'Výhřevnost'); pos('nozzleP', 'Tlak na proudnici'); pos('tLimit', 'Konec simulace'); pos('divisor', 'Dělitel časového kroku'); pos('sweep', 'Doba pokrytí');
+  if (!(i.segments >= 2 && i.segments <= 200 && Number.isInteger(i.segments))) e.push('Počet vrstev výpočtu musí být celé číslo od 2 do 200.');
+  if (!(i.emissivity > 0 && i.emissivity <= 1)) e.push('Emisivita musí být mezi 0 a 1.');
+  if (!(i.exposedPct >= 0 && i.exposedPct <= 100)) e.push('Palivo v dosahu vody zadejte v procentech 0–100.');
+  if (!(i.coneAngle > 0 && i.coneAngle <= 360)) e.push('Úhel kužele musí být mezi 0 a 360°.');
+  if (!(i.nozzleDist >= 0)) e.push('Vzdálenost proudnice nesmí být záporná.');
+  if (!(i.tWater >= 0)) e.push('Začátek hašení nesmí být záporný.');
+  if (i.tWater >= i.tLimit) e.push('Hašení musí začít před koncem simulace.');
+  if (!(i.tGasFlash > i.tGasCtl) || !(i.tWallFlash > i.tWallCtl)) e.push('Teploty při vzplanutí musí být vyšší než teploty pro požár pod kontrolou.');
+  if (!i.wallVents.length) e.push('Zadejte aspoň jeden stěnový otvor.');
+  i.wallVents.forEach((v, n) => {
+    const t = `Stěnový otvor ${n + 1}: `;
+    if (!(v.height > 0 && v.width > 0)) e.push(t + 'výška i šířka musí být kladné.');
+    if (!(v.top >= v.height)) e.push(t + 'horní hrana nemůže být níž, než je výška otvoru.');
+    if (!(v.top <= i.height)) e.push(t + 'horní hrana je nad stropem.');
+    if (!(v.close > v.open) || !(v.open >= 0)) e.push(t + 'čas zavření musí být po otevření.');
+  });
+  if (i.wallVents.length && !i.wallVents.some(v => v.open === 0)) e.push('V čase 0 musí být otevřený aspoň jeden stěnový otvor.');
+  const wv = i.wallVents[(i.waterVent || 1) - 1];
+  if (wv) { if (wv.open > i.tWater) e.push('Otvor, kterým se hasí, se otevírá až po začátku hašení.'); if (wv.close < i.tLimit) e.push('Otvor, kterým se hasí, musí zůstat otevřený do konce simulace.'); }
+  i.roofVents.forEach((v, n) => { if (!(v.rate > 0 && v.area > 0 && v.close > v.start && v.start >= 0)) e.push(`Střešní otvor ${n + 1}: zkontrolujte časy, rychlost a plochu.`); });
+  if (mode === 'single') { pos('waterRate', 'Průtok vody'); pos('dropSize', 'Velikost kapek'); }
+  else {
+    if (!(i.rateMin > 0 && i.rateMax > i.rateMin && i.rateInc > 0)) e.push('Rozsah průtoku: „od“ musí být kladné a menší než „do“, krok kladný.');
+    if (!(i.dropMin > 0 && i.dropMax > i.dropMin && i.dropInc > 0)) e.push('Rozsah kapek: „od“ musí být kladné a menší než „do“, krok kladný.');
+  }
+  if (i.fuelType === 'char') { ['c1', 'c2', 'c3', 'c4', 'c5', 'charHeat'].forEach(k => { if (!(i[k] > 0)) e.push('Parametry zuhelnaťujícího plastu musí být kladné.'); }); }
+  if (i.fuelType === 'melt') { ['plumeEmis', 'plumeRatio', 'tVap', 'fuelCp', 'fuelCond'].forEach(k => { if (!(i[k] > 0)) e.push('Parametry nezuhelnaťujícího plastu musí být kladné (kromě těch, kde 0 znamená „určí program“).'); }); }
+  return [...new Set(e)];
+}
+const ERR_CZ = [
+  [/NO WALL VENT OPEN AT TIME 0/, 'V čase 0 musí být otevřený aspoň jeden stěnový otvor.'],
+  [/ERROR DEFINING VENT/, 'Chybně zadaný otvor: horní hrana musí být nad spodní a spodní hrana nesmí být pod podlahou.'],
+  [/OPENED AFTER WATER/, 'Otvor, kterým se hasí, se otevírá až po začátku hašení.'],
+  [/CLOSED DURING WATER|CLOSED BEFORE END/, 'Otvor, kterým se hasí, musí zůstat otevřený do konce simulace.'],
+  [/MASSBL/, 'Výpočet proudění otvory pro toto zadání nekonvergoval. Na stejném místě se zastaví i původní program. Zkuste jiný průtok, velikost kapek, vzdálenost proudnice nebo dělitel časového kroku.'],
+  [/STEPLIMIT/, 'Výpočet překročil 300 000 časových kroků a byl zastaven. Zmenšete dělitel časového kroku nebo zkraťte simulaci.'],
+];
+function showErrors(list) {
+  const box = $('error');
+  if (!list.length) { box.hidden = true; return; }
+  const tr = list.map(m => { const h = ERR_CZ.find(([re]) => re.test(m)); return h ? h[1] : m; });
+  box.innerHTML = '<b>Výpočet nelze dokončit.</b><br>' + [...new Set(tr)].map(x => x.replace(/</g, '&lt;')).join('<br>');
+  box.hidden = false;
+}
+
+/* ===================== single simulation ===================== */
+const FDM = makeFDM();
+let sim = null;        // {out, T:[cols...], tEnd}
+let tNow = 0, playing = false;
+const COL = { t: 0, gas: 1, wall: 2, floor: 3, fuel: 4, hn: 5, q: 6, vin: 7, vout: 8, wapp: 9, wvap: 10, eta: 11, ld: 12, lex: 13, rate: 14, ltype: 15 };
+
+function runSim() {
+  const errs = validate('single');
+  if (errs.length) { showErrors(errs); return; }
+  $('run').disabled = true; $('run').textContent = 'Počítám…';
+  setTimeout(() => {
+    try {
+      const mi = modelInput();
+      const out = FDM.simulate(mi);
+      if (!out.curve.length) { showErrors(out.errors.length ? out.errors : ['Výpočet neproběhl.']); }
+      else {
+        showErrors(out.errors);
+        const n = out.curve.length, cols = [];
+        for (let c = 0; c < 16; c++) { const a = new Float64Array(n); for (let k = 0; k < n; k++) a[k] = out.curve[k][c]; cols.push(a); }
+        sim = { out, cols, n, tEnd: cols[0][n - 1], inp: mi, qMax: Math.max(1, ...cols[COL.q]) };
+        tNow = out.control ? out.control.time : sim.tEnd; playing = false;
+        renderSim();
+      }
+    } catch (err) { showErrors([String(err && err.message || err)]); }
+    $('run').disabled = false; setRunLabel();
+  }, 30);
+}
+function idxAt(t) { const T = sim.cols[0]; let lo = 0, hi = sim.n - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (T[m] <= t) lo = m; else hi = m - 1; } return lo; }
+function at(c, i) { return sim.cols[c][i]; }
+
+function renderSim() {
+  const o = sim.out, ev = o.events, f = o.final, inp = sim.inp;
+  const has = (t) => ev.find(e => e.type === t);
+  let pill, text;
+  if (o.control) { pill = ['ok', 'Pod kontrolou']; text = `Teplota plynu i stěn klesla pod zadané meze ${cs(o.control.time - inp.tWater, 1)} min po zahájení hašení.`; }
+  else if (o.errors.length) { pill = ['warn', 'Výpočet přerušen']; text = 'Model se zastavil dřív, než bylo možné rozhodnout. Hodnoty platí k poslednímu spočtenému času.'; }
+  else if (has('outbefore')) { pill = ['warn', 'Dohořelo bez hašení']; text = `Palivo vyhořelo v ${cs(has('burnout') ? has('burnout').time : f.time, 1)} min, tedy před začátkem hašení.`; }
+  else if (has('burnout')) { pill = ['bad', 'Nezvládnuto']; text = `Voda požár pod kontrolu nedostala; palivo vyhořelo v ${cs(has('burnout').time, 1)} min.`; }
+  else { pill = ['bad', 'Nezvládnuto']; text = `Do konce simulace (${cs(f.time, 1)} min) teploty pod zadané meze neklesly.`; }
+  const vapPct = f.waterApplied > 0 ? 100 * f.waterVaporized / f.waterApplied : 0;
+  $('verdict').innerHTML = `
+    <div class="state"><span class="pill ${pill[0]}">${pill[1]}</span><p>${text}</p></div>
+    <div class="tile"><div class="k">${o.control ? 'Čas zdolání' : 'Konec výpočtu'}</div><div class="v">${cs(o.control ? o.control.time : f.time, 1)} <small>min</small></div><div class="s">hašení od ${cs(inp.tWater, 2)} min</div></div>
+    <div class="tile"><div class="k">Aplikovaná voda</div><div class="v">${cs(f.waterApplied, 1)} <small>l</small></div><div class="s">průtok ${cs(inp.waterRate, 1)} l/min, kapky ${cs(inp.dropSize, 2)} mm</div></div>
+    <div class="tile"><div class="k">Odpařená voda</div><div class="v">${cs(f.waterVaporized, 1)} <small>l</small></div><div class="s">${cs(vapPct, 0)} % aplikované vody</div></div>
+    <div class="tile"><div class="k">Zbývající palivo</div><div class="v">${cs(100 * f.fuelFrac, 1)} <small>%</small></div><div class="s">dosah vody ${cs(o.derived.viewableFuel, 1)} m² povrchu paliva</div></div>`;
+  const NAMES = { extinguish: 'uhašeno palivo v dosahu vody', control: 'požár pod kontrolou', pyrolysis: 'pyrolýza dokončena', burnout: 'palivo vyhořelo', timelimit: 'konec simulace', outbefore: 'dohořelo před hašením' };
+  const chips = [{ type: 'start', time: 0, name: 'celkové vzplanutí' }, { type: 'water', time: inp.tWater, name: 'začátek hašení' }].concat(ev.filter(e => e.time !== undefined && isFinite(e.time)).map(e => ({ time: e.time, name: NAMES[e.type] || e.type, extra: e.type === 'extinguish' ? ` (${cs(100 * e.fraction, 0)} % paliva)` : '' })))
+    .filter(c => c.time <= sim.tEnd + 1e-6).sort((a, b) => a.time - b.time);
+  $('events').innerHTML = chips.map(c => `<button class="chip" type="button" data-t="${c.time}"><b>${cs(c.time, 2)} min</b> ${c.name}${c.extra || ''}</button>`).join('');
+  // table
+  const H = ['čas<br>min', 'plyn<br>°C', 'stěny<br>°C', 'podlaha<br>°C', 'akum. teplo<br>kcal', 'podíl<br>paliva', 'hoření<br>řídí', 'voda apl.<br>l', 'voda na podl.<br>l', 'voda odpař.<br>l', 'ztráta', 'odpar<br>v plynu', 'odpar<br>na stěnách', 'odpar<br>na palivu', 'odpar<br>na podlaze', 'odpar<br>celkem'];
+  const D = [1, 1, 1, 1, 0, 3, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+  $('table').innerHTML = '<thead><tr>' + H.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
+    o.rows.map(r => '<tr>' + r.map((v, k) => `<td>${k === 6 ? (v > 0 ? 'větrání' : 'palivo') : cs(v, D[k])}</td>`).join('') + '</tr>').join('') + '</tbody>';
+  $('time').max = 1000; $('time').value = Math.round(1000 * tNow / sim.tEnd);
+  build3D(); setTime(tNow);
+}
+function setTime(t) {
+  if (!sim) return;
+  tNow = Math.max(0, Math.min(sim.tEnd, t));
+  const i = idxAt(tNow);
+  $('clock').textContent = cs(tNow, 2) + ' min';
+  $('hud').innerHTML = [['plyn', cs(at(COL.gas, i), 0) + ' °C'], ['stěny', cs(at(COL.wall, i), 0) + ' °C'], ['podlaha', cs(at(COL.floor, i), 0) + ' °C'],
+    ['výkon', cs(at(COL.q, i) * 4186.8 / 60 / 1e6, 2) + ' MW'], ['palivo', cs(100 * at(COL.fuel, i), 1) + ' %'], ['voda', cs(at(COL.wapp, i), 1) + ' l'],
+    ['neutr. rovina', cs(at(COL.hn, i), 2) + ' m']].map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('');
+  drawCharts(); update3D(i);
+}
+
+/* ===================== charts (canvas) ===================== */
+function niceStep(range, n) { const r = range / n, p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+function plot(cv, opt) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const ink = css('--ink'), muted = css('--muted'), line = css('--line');
+  const L = 46, R = opt.rightAxis ? 50 : 12, T = 8, B = 26;
+  const x0 = opt.xmin || 0, x1 = opt.xmax, y0 = opt.ymin || 0;
+  let y1 = opt.ymax; const ys = niceStep(y1 - y0, 4); y1 = Math.ceil(y1 / ys - 1e-9) * ys;
+  const X = (x) => L + (x - x0) / (x1 - x0) * (w - L - R), Y = (y) => T + (1 - (y - y0) / (y1 - y0)) * (h - T - B);
+  g.font = '11px ' + css('--f-mono'); g.lineWidth = 1;
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let y = y0; y <= y1 + 1e-9; y += ys) { g.strokeStyle = line; g.beginPath(); g.moveTo(L, Y(y) + .5); g.lineTo(w - R, Y(y) + .5); g.stroke(); g.fillStyle = muted; g.fillText(cs(y, ys < 1 ? (ys < 0.1 ? 2 : 1) : 0), L - 6, Y(y)); if (opt.rightAxis) { g.textAlign = 'left'; g.fillText(cs(y * opt.rightAxis.k, opt.rightAxis.d), w - R + 6, Y(y)); g.textAlign = 'right'; } }
+  const xs = niceStep(x1 - x0, Math.max(3, Math.min(10, Math.floor(w / 80))));
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let x = Math.ceil(x0 / xs - 1e-9) * xs; x <= x1 + 1e-9; x += xs) { g.strokeStyle = line; g.beginPath(); g.moveTo(X(x) + .5, h - B); g.lineTo(X(x) + .5, h - B + 4); g.stroke(); g.fillStyle = muted; g.fillText(cs(x, xs < 1 ? (xs < 0.1 ? 2 : 1) : 0), X(x), h - B + 7); }
+  g.textAlign = 'right'; g.fillText(opt.xlabel || 'min', w - R, h - 12);
+  g.save(); g.beginPath(); g.rect(L, T - 2, w - L - R, h - T - B + 4); g.clip();
+  for (const b of (opt.bands || [])) { g.fillStyle = b.color; g.globalAlpha = .12; g.fillRect(X(b.x0), T, X(b.x1) - X(b.x0), h - T - B); g.globalAlpha = 1; }
+  for (const a of (opt.areas || [])) { g.beginPath(); g.moveTo(X(a.x[0]), Y(y1)); for (let k = 0; k < a.x.length; k++) g.lineTo(X(a.x[k]), Y(a.y[k])); g.lineTo(X(a.x[a.x.length - 1]), Y(y1)); g.closePath(); g.fillStyle = a.color; g.globalAlpha = a.alpha || .1; g.fill(); g.globalAlpha = 1; }
+  for (const hl of (opt.hlines || [])) { g.setLineDash([5, 4]); g.strokeStyle = hl.color; g.beginPath(); g.moveTo(L, Y(hl.y)); g.lineTo(w - R, Y(hl.y)); g.stroke(); g.setLineDash([]); g.fillStyle = hl.color; g.textAlign = 'right'; g.textBaseline = 'bottom'; g.fillText(hl.label, w - R - 4, Y(hl.y) - 2); }
+  for (const s of opt.series) {
+    if (s.dots) { g.fillStyle = s.color; g.globalAlpha = s.alpha || .5; for (let k = 0; k < s.x.length; k++) { g.beginPath(); g.arc(X(s.x[k]), Y(s.y[k]), s.r || 2, 0, 6.3); g.fill(); } g.globalAlpha = 1; continue; }
+    const n = s.x.length, step = Math.max(1, Math.floor(n / 1600));
+    g.beginPath(); for (let k = 0; k < n; k += step) { const px = X(s.x[k]), py = Y(s.y[k]); k ? g.lineTo(px, py) : g.moveTo(px, py); } g.lineTo(X(s.x[n - 1]), Y(s.y[n - 1]));
+    if (s.fill) { g.save(); g.lineTo(X(s.x[n - 1]), Y(y0)); g.lineTo(X(s.x[0]), Y(y0)); g.closePath(); g.fillStyle = s.color; g.globalAlpha = .1; g.fill(); g.restore(); g.beginPath(); for (let k = 0; k < n; k += step) { const px = X(s.x[k]), py = Y(s.y[k]); k ? g.lineTo(px, py) : g.moveTo(px, py); } g.lineTo(X(s.x[n - 1]), Y(s.y[n - 1])); }
+    g.strokeStyle = s.color; g.lineWidth = s.w || 2; g.lineJoin = 'round'; g.stroke(); g.lineWidth = 1;
+    if (s.marks) { g.fillStyle = s.color; for (let k = 0; k < n; k++) { g.beginPath(); g.arc(X(s.x[k]), Y(s.y[k]), 2.6, 0, 6.3); g.fill(); } }
+  }
+  for (const v of (opt.vlines || [])) { g.strokeStyle = v.color; g.setLineDash(v.dash || []); g.beginPath(); g.moveTo(X(v.x) + .5, T); g.lineTo(X(v.x) + .5, h - B); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = v.color; g.textAlign = X(v.x) > w - R - 90 ? 'right' : 'left'; g.textBaseline = 'top'; g.fillText(v.label, X(v.x) + (g.textAlign === 'left' ? 5 : -5), T + 2 + (v.row || 0) * 13); } }
+  if (opt.cursor !== undefined) {
+    g.strokeStyle = ink; g.beginPath(); g.moveTo(X(opt.cursor) + .5, T); g.lineTo(X(opt.cursor) + .5, h - B); g.stroke();
+    for (const s of opt.series) if (s.cy !== undefined) { g.fillStyle = s.color; g.beginPath(); g.arc(X(opt.cursor), Y(s.cy), 4, 0, 6.3); g.fill(); g.strokeStyle = css('--surface'); g.lineWidth = 1.5; g.stroke(); g.lineWidth = 1; }
+  }
+  g.restore();
+  cv._map = { x0, x1, L, R, w };
+}
+function drawCharts() {
+  if (!sim || view !== 'simulace') return;
+  const c = sim.cols, T = c[0], i = idxAt(tNow), inp = sim.inp, o = sim.out;
+  const fire = css('--fire'), water = css('--water'), muted = css('--muted');
+  const vl = [{ x: inp.tWater, color: water, dash: [3, 3], label: 'začátek hašení' }];
+  if (o.control) vl.push({ x: o.control.time, color: css('--ok'), dash: [3, 3], label: 'pod kontrolou', row: 1 });
+  const S = (col, color, k = 1) => { const y = k === 1 ? c[col] : Float64Array.from(c[col], v => v * k); return { x: T, y, color, cy: y[i] }; };
+  const mx = (a, k = 1) => { let m = 0; for (let j = 0; j < a.length; j++) if (a[j] > m) m = a[j]; return m * k; };
+  plot($('c-temp'), { xmax: sim.tEnd, ymax: Math.max(mx(c[COL.gas]), mx(c[COL.wall]), 300) * 1.04, cursor: tNow, vlines: vl,
+    hlines: [{ y: inp.tGasCtl, color: muted, label: 'mez pro požár pod kontrolou' }], series: [S(COL.floor, css('--floor')), S(COL.wall, css('--wall')), S(COL.gas, fire)] });
+  const kMW = 4186.8 / 60 / 1e6;
+  plot($('c-hrr'), { xmax: sim.tEnd, ymax: mx(c[COL.q], kMW) * 1.1 || 1, cursor: tNow, vlines: [{ x: inp.tWater, color: water, dash: [3, 3] }], series: [Object.assign(S(COL.q, fire, kMW), { fill: true })] });
+  plot($('c-fuel'), { xmax: sim.tEnd, ymax: 100, cursor: tNow, vlines: [{ x: inp.tWater, color: water, dash: [3, 3] }], series: [Object.assign(S(COL.fuel, css('--wall'), 100), { fill: true })] });
+  plot($('c-water'), { xmax: sim.tEnd, ymax: Math.max(mx(c[COL.wapp]) * 1.1, 1), cursor: tNow, series: [Object.assign(S(COL.wapp, water), { fill: true }), S(COL.wvap, muted)] });
+  plot($('c-flow'), { xmax: sim.tEnd, ymax: Math.max(mx(c[COL.vout]), mx(c[COL.vin])) * 1.1 || 1, cursor: tNow, vlines: [{ x: inp.tWater, color: water, dash: [3, 3] }], series: [S(COL.vin, water), S(COL.vout, fire)] });
+}
+function chartScrub(cv) {
+  let down = false;
+  const go = (e) => { const m = cv._map; if (!m || !sim) return; const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left - m.L) / (m.w - m.L - m.R); stopPlay(); setTime(m.x0 + x * (m.x1 - m.x0)); $('time').value = Math.round(1000 * tNow / sim.tEnd); };
+  cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); go(e); });
+  cv.addEventListener('pointermove', (e) => { if (down) go(e); });
+  cv.addEventListener('pointerup', () => { down = false; }); cv.addEventListener('pointercancel', () => { down = false; });
+  cv.style.cursor = 'crosshair'; cv.style.touchAction = 'pan-y';
+}
+
+/* ===================== 3D room (three.js) ===================== */
+const STOPS = [[20, [70, 104, 138]], [200, [196, 160, 52]], [500, [226, 106, 30]], [800, [236, 58, 26]], [1200, [255, 226, 170]]];
+function tempRGB(t) { t = Math.max(20, Math.min(1200, t)); for (let k = 1; k < STOPS.length; k++) if (t <= STOPS[k][0]) { const a = STOPS[k - 1], b = STOPS[k], f = (t - a[0]) / (b[0] - a[0]); return [0, 1, 2].map(j => (a[1][j] + f * (b[1][j] - a[1][j])) / 255); } return [1, 1, 1]; }
+$('tbar').style.background = 'linear-gradient(90deg,' + [20, 200, 400, 600, 800, 1000, 1200].map(t => { const c = tempRGB(t); return `rgb(${c.map(v => Math.round(v * 255)).join(',')}) ${((t - 20) / 1180 * 100).toFixed(0)}%`; }).join(',') + ')';
+const G = { ready: false };
+function dot(size) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const r = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.45, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, size, size); return new THREE.CanvasTexture(c); }
+function init3D() {
+  if (typeof THREE === 'undefined') { $('stage').insertAdjacentHTML('beforeend', '<p class="note" style="position:absolute;inset:auto 12px 40px 12px">3D zobrazení se nepodařilo načíst; grafy a tabulka fungují dál.</p>'); return; }
+  const cv = $('gl');
+  let r; try { r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e) { $('stage').insertAdjacentHTML('beforeend', '<p class="note" style="position:absolute;inset:auto 12px 40px 12px">Prohlížeč nepodporuje WebGL; grafy a tabulka fungují dál.</p>'); return; }
+  G.r = r; G.scene = new THREE.Scene(); G.cam = new THREE.PerspectiveCamera(38, 1, 0.05, 400);
+  G.orbit = { th: 0.75, ph: 1.12, d: 9, tx: 0, ty: 1, tz: 0 };
+  G.tex = dot(64); G.root = new THREE.Group(); G.scene.add(G.root); G.ready = true;
+  let drag = null; const st = $('stage');
+  st.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; st.setPointerCapture(e.pointerId); });
+  st.addEventListener('pointermove', (e) => { if (!drag) return; G.orbit.th -= (e.clientX - drag.x) * 0.008; G.orbit.ph = Math.max(0.15, Math.min(1.5, G.orbit.ph - (e.clientY - drag.y) * 0.006)); drag = { x: e.clientX, y: e.clientY }; });
+  st.addEventListener('pointerup', () => { drag = null; }); st.addEventListener('pointercancel', () => { drag = null; });
+  st.addEventListener('wheel', (e) => { e.preventDefault(); G.orbit.d = Math.max(G.minD || 2, Math.min(G.maxD || 60, G.orbit.d * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+  requestAnimationFrame(frame);
+}
+function mat(color, opacity) { return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }); }
+function particles(n, size, blending) {
+  const geo = new THREE.BufferGeometry(); const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.PointsMaterial({ size, map: G.tex, transparent: true, depthWrite: false, vertexColors: true, blending: blending || THREE.NormalBlending, sizeAttenuation: true });
+  const p = new THREE.Points(geo, m); p.frustumCulled = false;
+  return { p, pos, col, n, life: new Float32Array(n), vel: new Float32Array(n * 3), age: new Float32Array(n).fill(1e9) };
+}
+function build3D() {
+  if (!G.ready || !sim) return;
+  const inp = sim.inp, root = G.root;
+  while (root.children.length) { const c = root.children.pop(); c.traverse && c.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose && o.material.dispose(); }); }
+  const H = inp.height, A = inp.floorArea, P = Math.max(0, (inp.wallArea - A) / H);   // footprint from floor area and wall perimeter
+  let a, b; const disc = P * P / 16 - A; if (disc > 0) { a = P / 4 + Math.sqrt(disc); b = A / a; } else { a = b = Math.sqrt(A); }
+  G.dim = { a, b, H };
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(a, H, b)), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--muted')) })); edge.position.y = H / 2; root.add(edge);
+  G.floor = new THREE.Mesh(new THREE.PlaneGeometry(a, b), mat(0x888888, .9)); G.floor.rotation.x = -Math.PI / 2; G.floor.position.y = 0.002; root.add(G.floor);
+  G.walls = [];
+  const wallDefs = [[0, 0, b / 2, 0, a], [a / 2, 0, 0, Math.PI / 2, b], [0, 0, -b / 2, Math.PI, a], [-a / 2, 0, 0, -Math.PI / 2, b]];  // x, _, z, rotY, width; normal points outward
+  wallDefs.forEach(([x, , z, ry, wd]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(wd, H), mat(0x888888, .3)); m.position.set(x, H / 2, z); m.rotation.y = ry; root.add(m); G.walls.push(m); });
+  G.ceil = new THREE.Mesh(new THREE.PlaneGeometry(a, b), mat(0x888888, .16)); G.ceil.rotation.x = -Math.PI / 2; G.ceil.position.y = H; root.add(G.ceil);
+  G.gas = new THREE.Mesh(new THREE.BoxGeometry(a * .98, H * .98, b * .98), mat(0xff5500, .1)); G.gas.position.y = H / 2; root.add(G.gas);
+  // wall vents: spread over the four walls, front wall first
+  G.vents = [];
+  const perWall = [0, 0, 0, 0]; inp.wallVents.forEach((v, i) => perWall[i % 4]++);
+  const seen = [0, 0, 0, 0];
+  inp.wallVents.forEach((v, i) => {
+    const wi = i % 4, [x, , z, ry, wd] = wallDefs[wi]; const k = seen[wi]++, cnt = perWall[wi];
+    const off = (cnt === 1 ? 0 : (k / (cnt - 1) - .5) * (wd - Math.min(v.width, wd) - .2));
+    const grp = new THREE.Group(); grp.position.set(x, 0, z); grp.rotation.y = ry; root.add(grp);
+    const w = Math.min(v.width, wd * .96), bot = v.top - v.height;
+    const hot = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat(0xe0452b, .75)), cold = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat(0x3f7fc4, .55)), shut = new THREE.Mesh(new THREE.PlaneGeometry(w, v.height), mat(new THREE.Color(css('--muted')), .85));
+    shut.position.set(off, bot + v.height / 2, 0.012);
+    const fr = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-w / 2, bot], [w / 2, bot], [w / 2, v.top], [-w / 2, v.top]].map(([px, py]) => new THREE.Vector3(px + off, py, 0.015))), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--ink')) }));
+    const arrow = (color) => { const g2 = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, 1, 8), new THREE.MeshBasicMaterial({ color })); sh.rotation.x = Math.PI / 2; sh.position.z = .5; const hd = new THREE.Mesh(new THREE.ConeGeometry(.08, .2, 10), new THREE.MeshBasicMaterial({ color })); hd.rotation.x = Math.PI / 2; hd.position.z = 1.05; g2.add(sh, hd); return g2; };
+    const aOut = arrow(0xe0452b), aIn = arrow(0x3f7fc4);
+    grp.add(hot, cold, shut, fr, aOut, aIn);
+    G.vents.push({ v, grp, hot, cold, shut, aOut, aIn, off, w, bot, wi, ry, x, z });
+  });
+  G.roof = inp.roofVents.map((v, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat(0xe0452b, .7)); m.rotation.x = -Math.PI / 2; const n = inp.roofVents.length; m.position.set((n === 1 ? 0 : (i / (n - 1) - .5) * a * .6), H + .01, -b * .2); root.add(m); return { v, m }; });
+  // fuel crib
+  G.crib = new THREE.Group(); root.add(G.crib);
+  const s = Math.min(a, b) * .46, bars = 4, layers = 4, bw = s / (bars * 2 - 1), bh = Math.min(H * .09, bw);
+  for (let L2 = 0; L2 < layers; L2++) for (let k = 0; k < bars; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(L2 % 2 ? s : bw, bh, L2 % 2 ? bw : s), new THREE.MeshBasicMaterial({ color: 0x6b4a2b })); m.position.set(L2 % 2 ? 0 : (k * 2 * bw - s / 2 + bw / 2), bh / 2 + L2 * bh, L2 % 2 ? (k * 2 * bw - s / 2 + bw / 2) : 0); G.crib.add(m); }
+  G.cribTop = layers * bh; G.cribS = s;
+  G.fire = particles(420, Math.max(.28, H * .16), THREE.AdditiveBlending); G.spray = particles(360, Math.max(.07, H * .035)); G.steam = particles(160, Math.max(.3, H * .16));
+  root.add(G.fire.p, G.spray.p, G.steam.p);
+  const far = Math.max(a, b, H); G.orbit.d = far * 2.6 + 2.2; G.minD = far * .9; G.maxD = far * 6; G.orbit.ty = H * .45;
+}
+function update3D(i) {
+  if (!G.ready || !sim || !G.dim) return;
+  const { a, b, H } = G.dim, t = at(COL.t, i);
+  const tg = at(COL.gas, i), tw = at(COL.wall, i), tf = at(COL.floor, i);
+  const cw = tempRGB(tw), cf = tempRGB(tf), cg = tempRGB(tg);
+  G.walls.forEach(m => m.material.color.setRGB(cw[0], cw[1], cw[2])); G.ceil.material.color.setRGB(cw[0], cw[1], cw[2]);
+  G.floor.material.color.setRGB(cf[0] * .8, cf[1] * .8, cf[2] * .8);
+  G.gas.material.color.setRGB(cg[0], cg[1], cg[2]); G.gas.material.opacity = Math.max(.02, Math.min(.34, (tg - 60) / 2600));
+  const fuel = at(COL.fuel, i);
+  G.crib.scale.y = Math.max(.08, fuel); G.crib.children.forEach(m => m.material.color.setRGB(.42 * fuel + .06, .29 * fuel + .05, .17 * fuel + .04));
+  const hn = at(COL.hn, i), vout = at(COL.vout, i), vin = at(COL.vin, i), fmax = sim.fMax || (sim.fMax = Math.max(1, ...sim.cols[COL.vout]));
+  G.vents.forEach((o) => {
+    const v = o.v, open = t >= v.open && t < v.close;
+    o.shut.visible = !open; o.hot.visible = o.cold.visible = o.aOut.visible = o.aIn.visible = open;
+    if (!open) return;
+    const np = Math.max(o.bot, Math.min(v.top, hn));
+    const hh = v.top - np, ch = np - o.bot;
+    o.hot.visible = hh > .005; o.cold.visible = ch > .005;
+    o.hot.scale.set(o.w, Math.max(hh, .001), 1); o.hot.position.set(o.off, np + hh / 2, .01);
+    o.cold.scale.set(o.w, Math.max(ch, .001), 1); o.cold.position.set(o.off, o.bot + ch / 2, .01);
+    const lo = .25 + 1.1 * Math.sqrt(vout / fmax), li = .25 + 1.1 * Math.sqrt(vin / fmax);
+    o.aOut.visible = hh > .02 && vout > 0; o.aOut.position.set(o.off, np + hh * .6, .05); o.aOut.scale.set(1, 1, lo);
+    o.aIn.visible = ch > .02 && vin > 0; o.aIn.position.set(o.off, o.bot + ch * .45, .05 + li + .2); o.aIn.scale.set(1, 1, -li);
+  });
+  G.roof.forEach(({ v, m }) => { const ar = t >= v.start && t < v.close ? Math.min(v.area, v.rate * (t - v.start)) : 0; m.visible = ar > 0; const s2 = Math.sqrt(Math.max(ar, 1e-4)); m.scale.set(s2, s2, 1); });
+  G.live = { q: at(COL.q, i) / sim.qMax, water: at(COL.ld, i) === 1 && t >= sim.inp.tWater && !(sim.out.control && t >= sim.out.control.time - 1e-6), steam: at(COL.eta, i), tg };
+}
+let lastT = 0;
+const still = window.matchMedia('(prefers-reduced-motion: reduce)');
+function emit(ps, k, x, y, z, vx, vy, vz, life) { ps.pos[3 * k] = x; ps.pos[3 * k + 1] = y; ps.pos[3 * k + 2] = z; ps.vel[3 * k] = vx; ps.vel[3 * k + 1] = vy; ps.vel[3 * k + 2] = vz; ps.life[k] = life; ps.age[k] = 0; }
+function frame(ts) {
+  requestAnimationFrame(frame);
+  if (!G.ready || view !== 'simulace' || document.hidden) return;
+  const dt = Math.min(.05, (ts - lastT) / 1000 || .016); lastT = ts;
+  if (playing && sim) { const sp = sim.tEnd / 14; let t = tNow + dt * sp; if (t >= sim.tEnd) { t = sim.tEnd; stopPlay(); } setTime(t); $('time').value = Math.round(1000 * tNow / sim.tEnd); }
+  const st = $('stage'), w = st.clientWidth, h = st.clientHeight;
+  if (G.w !== w || G.h !== h) { G.w = w; G.h = h; G.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); G.r.setSize(w, h, false); G.cam.aspect = w / h; G.cam.updateProjectionMatrix(); }
+  const o = G.orbit; G.cam.position.set(o.tx + o.d * Math.sin(o.ph) * Math.sin(o.th), o.ty + o.d * Math.cos(o.ph), o.tz + o.d * Math.sin(o.ph) * Math.cos(o.th)); G.cam.lookAt(o.tx, o.ty, o.tz);
+  if (G.dim && G.live && G.fire) {
+    const { a, b, H } = G.dim, L = G.live, move = !still.matches;
+    // flames
+    const F = G.fire, want = Math.round(F.n * Math.min(1, .15 + .85 * L.q)) * (L.q > .002 ? 1 : 0);
+    for (let k = 0; k < F.n; k++) {
+      if (F.age[k] >= F.life[k]) { if (k < want) { const s = G.cribS * .55; emit(F, k, (Math.random() - .5) * s * 2, G.cribTop * G.crib.scale.y * Math.random(), (Math.random() - .5) * s * 2, (Math.random() - .5) * .3, H * (.5 + .9 * Math.random()) * (.5 + .7 * Math.sqrt(L.q)), (Math.random() - .5) * .3, .5 + Math.random() * .8); if (!move) F.age[k] = Math.random() * F.life[k]; } else { F.pos[3 * k + 1] = -99; continue; } }
+      const f = F.age[k] / F.life[k]; if (move) { F.age[k] += dt; for (let j = 0; j < 3; j++) F.pos[3 * k + j] += F.vel[3 * k + j] * dt; } else { F.pos[3 * k + 1] = G.cribTop * G.crib.scale.y + F.vel[3 * k + 1] * f * F.life[k]; }
+      if (F.pos[3 * k + 1] > H * .97) { F.pos[3 * k + 1] = H * .97; F.vel[3 * k] *= 1.06; F.vel[3 * k + 2] *= 1.06; }
+      const e = (1 - f); F.col[3 * k] = 1.0 * e; F.col[3 * k + 1] = (.75 - .5 * f) * e; F.col[3 * k + 2] = .12 * e * e;
+    }
+    F.p.geometry.attributes.position.needsUpdate = true; F.p.geometry.attributes.color.needsUpdate = true;
+    // water spray through the chosen vent
+    const S = G.spray, vv = G.vents[(sim.inp.waterVent || 1) - 1] || G.vents[0];
+    if (vv) {
+      const nx = Math.sin(vv.ry), nz = Math.cos(vv.ry), tx = Math.cos(vv.ry), tz = -Math.sin(vv.ry);
+      const dist = Math.max(.12, sim.inp.nozzleDist), ox = vv.x + nx * dist + tx * vv.off, oz = vv.z + nz * dist + tz * vv.off, oy = vv.bot + vv.v.height * .55;
+      const half = Math.min(80, sim.inp.coneAngle / 2) * Math.PI / 180, reach = (vv.wi % 2 ? a : b) + dist, sp = reach / .55;
+      for (let k = 0; k < S.n; k++) {
+        if (S.age[k] >= S.life[k]) { if (L.water) { const r = Math.tan(half) * Math.sqrt(Math.random()), an = Math.random() * 6.283; emit(S, k, ox, oy, oz, (-nx + tx * r * Math.cos(an)) * sp, r * Math.sin(an) * sp, (-nz + tz * r * Math.cos(an)) * sp, .35 + Math.random() * .25); if (!move) S.age[k] = Math.random() * S.life[k]; } else { S.pos[3 * k + 1] = -99; continue; } }
+        if (move) { S.age[k] += dt; S.vel[3 * k + 1] -= 4 * dt; for (let j = 0; j < 3; j++) S.pos[3 * k + j] += S.vel[3 * k + j] * dt; } else { const f = S.age[k]; S.pos[3 * k] = ox + S.vel[3 * k] * f; S.pos[3 * k + 1] = oy + S.vel[3 * k + 1] * f; S.pos[3 * k + 2] = oz + S.vel[3 * k + 2] * f; }
+        const px = S.pos[3 * k], py = S.pos[3 * k + 1], pz = S.pos[3 * k + 2];
+        if (py < 0.02 || py > H || Math.abs(px) > a / 2 + dist + .05 || Math.abs(pz) > b / 2 + dist + .05) S.age[k] = 1e9;
+        S.col[3 * k] = .22; S.col[3 * k + 1] = .66; S.col[3 * k + 2] = .88;
+      }
+      S.p.geometry.attributes.position.needsUpdate = true; S.p.geometry.attributes.color.needsUpdate = true;
+      // steam leaving through the top of the vent
+      const Q = G.steam, wantS = L.water ? Math.round(Q.n * Math.min(1, L.steam * 1.6)) : 0;
+      for (let k = 0; k < Q.n; k++) {
+        if (Q.age[k] >= Q.life[k]) { if (k < wantS) { emit(Q, k, vv.x + tx * (vv.off + (Math.random() - .5) * vv.w * .8), vv.v.top - Math.random() * vv.v.height * .3, vv.z + tz * (vv.off + (Math.random() - .5) * vv.w * .8), nx * (.6 + Math.random() * .5), .5 + Math.random() * .6, nz * (.6 + Math.random() * .5), 1.2 + Math.random()); if (!move) Q.age[k] = Math.random() * Q.life[k]; } else { Q.pos[3 * k + 1] = -99; continue; } }
+        if (move) { Q.age[k] += dt; for (let j = 0; j < 3; j++) Q.pos[3 * k + j] += Q.vel[3 * k + j] * dt; } else { const f = Q.age[k]; Q.pos[3 * k] += 0; }
+        const e = .55 * (1 - Q.age[k] / Q.life[k]); Q.col[3 * k] = e * .85; Q.col[3 * k + 1] = e * .9; Q.col[3 * k + 2] = e * .95;
+      }
+      Q.p.geometry.attributes.position.needsUpdate = true; Q.p.geometry.attributes.color.needsUpdate = true;
+    }
+  }
+  G.r.render(G.scene, G.cam);
+}
+function stopPlay() { playing = false; $('play').textContent = '▶'; $('play').setAttribute('aria-label', 'Přehrát průběh'); }
+
+/* ===================== failure line ===================== */
+let fl = null;          // {line, pts, label, running, inp}
+let flJob = null;
+let compare = [];
+function sampleLine(pct) { const s = SAMPLES[pct]; return { line: s.line.map(([drop, rate, water]) => ({ drop, rate, water })), pts: s.pts, sims: s.sims, label: `Vzor: ${pct} % paliva v dosahu vody`, area: 35.7, sample: true }; }
+function flLabel(inp) { return `${cs(inp.floorArea, 1)} m², ${cs(inp.exposedPct, 0)} % paliva v dosahu, hašení od ${cs(inp.tWater, 1)} min`; }
+function runFL() {
+  const errs = validate('failure');
+  if (errs.length) { showErrors(errs); return; }
+  showErrors([]);
+  const inp = modelInput();
+  let job;
+  try { job = FDM.failureLine(inp); } catch (e) { showErrors([String(e.message || e)]); return; }
+  flJob = { job, stop: false, t0: performance.now() };
+  fl = { line: [], pts: [], label: flLabel(inp), area: inp.floorArea + inp.wallArea, running: true, sims: 0 };
+  $('run').disabled = true; $('stop').hidden = false; $('fl-progress-box').hidden = false;
+  const span = inp.dropMax - inp.dropMin;
+  const tick = () => {
+    if (!flJob) return;
+    const tEnd = performance.now() + 45; let done = false;
+    while (!done && performance.now() < tEnd && !flJob.stop) done = job.step();
+    const cur = job.current(); fl.sims = job.out.sims;
+    fl.line = job.line(); fl.pts = job.out.points.filter(p => p[0] > 0).map(p => [p[0], p[1] * 3.785]);
+    const pr = Math.max(0, Math.min(1, (cur.drop - inp.dropMin) / span));
+    $('fl-bar').style.width = (done ? 100 : pr * 100).toFixed(1) + '%';
+    $('fl-status').textContent = done ? '' : `simulace č. ${fl.sims}: průtok ${cs(cur.rate, 1)} l/min, kapky ${cs(cur.drop, 3)} mm`;
+    renderFL();
+    if (done || flJob.stop) {
+      const stopped = flJob.stop && !done; flJob = null; fl.running = false; $('run').disabled = false; $('stop').hidden = true; $('fl-progress-box').hidden = true;
+      if (job.out.errors.length) showErrors(job.out.errors);
+      else if (!fl.line.length && !stopped) showErrors(['V zadaném rozsahu průtoků a velikostí kapek se požár nepodařilo dostat pod kontrolu ani jednou. Zvyšte horní mez průtoku.']);
+      renderFL();
+    } else setTimeout(tick, 0);
+  };
+  setTimeout(tick, 20);
+}
+function renderFL() {
+  if (!fl) return;
+  $('fl-caption').textContent = fl.label + (fl.running ? ' · počítám…' : fl.sims ? ` · ${fl.sims} simulací` : '');
+  const L = fl.line;
+  $('fl-table').innerHTML = '<thead><tr><th>kapky<br>mm</th><th>nejmenší průtok<br>l/min</th><th>na plochu povrchů<br>l/min·m²</th><th>spotřeba vody<br>l</th></tr></thead><tbody>' +
+    L.map(p => `<tr><td>${cs(p.drop, 3)}</td><td>${cs(p.rate, 1)}</td><td>${cs(p.rate / fl.area, 3)}</td><td>${cs(p.water, 0)}</td></tr>`).join('') + '</tbody>';
+  $('fl-add').disabled = !L.length || fl.running;
+  drawFL();
+}
+function drawFL() {
+  if (!fl || view !== 'mezni-krivka') return;
+  const L = fl.line, xmax = Math.max(inputs.dropMax || 1, ...L.map(p => p.drop), .1), ymax = Math.max(10, ...fl.pts.map(p => p[1]), ...L.map(p => p.rate)) * 1.08;
+  const xs = L.map(p => p.drop), ys = L.map(p => p.rate);
+  plot($('c-fl'), { xmax, ymax, xlabel: 'kapky, mm', rightAxis: { k: 1 / fl.area, d: 2 },
+    areas: L.length > 1 ? [{ x: xs, y: ys, color: css('--ok'), alpha: .1 }] : [],
+    series: [{ dots: true, x: fl.pts.map(p => p[0]), y: fl.pts.map(p => p[1]), color: css('--water'), alpha: .45, r: 2 }].concat(L.length ? [{ x: xs, y: ys, color: css('--fire'), w: 2.5, marks: true }] : []) });
+}
+const XCOL = ['--fire', '--water', '--wall', '--floor', '--ok', '--muted'];
+function renderX() {
+  $('x-list').innerHTML = compare.map((c, i) => `<div class="rowflex"><span><span class="swatch" style="background:var(${XCOL[i % XCOL.length]})"></span>${c.label.replace(/</g, '&lt;')}</span><span class="note num">nejnižší průtok ${cs(Math.min(...c.line.map(p => p.rate)), 1)} l/min při ${cs(c.line.reduce((m, p) => p.rate < m.rate ? p : m).drop, 2)} mm</span><span style="flex:1"></span><button class="mini" type="button" data-rm="${i}">Odebrat</button></div>`).join('') || '<p class="note">Zatím žádná křivka.</p>';
+  drawX();
+}
+function drawX() {
+  if (view !== 'porovnani') return;
+  const all = compare.flatMap(c => c.line);
+  plot($('c-x'), { xmax: Math.max(1, ...all.map(p => p.drop)), ymax: Math.max(10, ...all.map(p => p.rate)) * 1.08, xlabel: 'kapky, mm',
+    series: compare.map((c, i) => ({ x: c.line.map(p => p.drop), y: c.line.map(p => p.rate), color: css(XCOL[i % XCOL.length]), w: 2.5, marks: true })) });
+}
+
+/* ===================== shell ===================== */
+function setRunLabel() { $('run').textContent = view === 'simulace' ? 'Spustit simulaci' : 'Vyhledat mezní křivku'; }
+function setView(v, fromHash) {
+  if (!['simulace', 'mezni-krivka', 'porovnani'].includes(v)) v = 'simulace';
+  view = v;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view === v ? 'true' : 'false'));
+  document.querySelectorAll('.view').forEach(s => { s.hidden = s.id !== 'view-' + v; });
+  setRunLabel(); $('g-range').open = v !== 'simulace';
+  if (!fromHash) { try { history.replaceState(null, '', '#' + v); } catch (e) { location.hash = v; } }
+  requestAnimationFrame(() => { drawCharts(); drawFL(); drawX(); });
+}
+async function copy(text, btn) { const old = btn.textContent; try { await navigator.clipboard.writeText(text); btn.textContent = 'Zkopírováno'; } catch (e) { btn.textContent = 'Kopírování se nepovedlo'; } setTimeout(() => { btn.textContent = old; }, 1600); }
+function start(saved) {
+  if (saved && saved.inputs) inputs = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), saved.inputs);
+  buildForm(); wireForm(); fillForm();
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
+  window.addEventListener('hashchange', () => setView(location.hash.slice(1), true));
+  $('run').addEventListener('click', () => { if (view === 'simulace') runSim(); else { if (view === 'porovnani') setView('mezni-krivka'); runFL(); } });
+  $('stop').addEventListener('click', () => { if (flJob) flJob.stop = true; });
+  $('time').addEventListener('input', (e) => { stopPlay(); if (sim) setTime(sim.tEnd * e.target.value / 1000); });
+  $('play').addEventListener('click', () => { if (!sim) return; if (playing) return stopPlay(); if (tNow >= sim.tEnd - 1e-6) setTime(0); playing = true; $('play').textContent = '❚❚'; $('play').setAttribute('aria-label', 'Pozastavit'); });
+  $('events').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (b && sim) { stopPlay(); setTime(Number(b.dataset.t)); $('time').value = Math.round(1000 * tNow / sim.tEnd); } });
+  ['c-temp', 'c-hrr', 'c-fuel', 'c-water', 'c-flow'].forEach(id => chartScrub($(id)));
+  $('copy-table').addEventListener('click', (e) => { if (!sim) return; const head = 'cas_min;plyn_C;steny_C;podlaha_C;akum_teplo_kcal;podil_paliva;rizeni(1=vetrani,-1=palivo);voda_apl_l;voda_podlaha_l;voda_odpar_l;ztrata;odpar_plyn;odpar_steny;odpar_palivo;odpar_podlaha;odpar_celkem'; copy(head + '\n' + sim.out.rows.map(r => r.map(v => String(+Number(v).toPrecision(6)).replace('.', ',')).join(';')).join('\n'), e.target); });
+  $('copy-fl').addEventListener('click', (e) => { if (!fl) return; copy('kapky_mm;prutok_l_min;prutok_l_min_m2;spotreba_l\n' + fl.line.map(p => [p.drop, p.rate.toFixed(2), (p.rate / fl.area).toFixed(4), p.water.toFixed(1)].join(';').replace(/\./g, ',')).join('\n'), e.target); });
+  $('fl-add').addEventListener('click', () => { if (fl && fl.line.length) { compare.push({ label: fl.label, line: fl.line.slice() }); renderX(); $('fl-add').textContent = 'Přidáno'; setTimeout(() => { $('fl-add').textContent = 'Přidat křivku do porovnání'; }, 1400); } });
+  $('x-list').addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (b) { compare.splice(+b.dataset.rm, 1); renderX(); } });
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { drawCharts(); drawFL(); drawX(); }, 80); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawCharts(); drawFL(); drawX(); if (sim) { build3D(); setTime(tNow); } });
+  new MutationObserver(() => { drawCharts(); drawFL(); drawX(); if (sim) { build3D(); setTime(tNow); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  // examples shown before the first own run: both sample failure lines shipped with the original program
+  fl = sampleLine(25); compare = [sampleLine(25), sampleLine(75)];
+  init3D();
+  setView(location.hash.slice(1) || 'simulace', true);
+  renderFL(); renderX();
+  runSim();
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ inputs }));
+}
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start); else start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+</script>
+</body>
+</html>
